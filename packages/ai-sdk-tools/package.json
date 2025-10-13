@@ -1,0 +1,51 @@
+{
+  "name": "@parallel-web/ai-sdk-tools",
+  "version": "0.1.0",
+  "description": "AI SDK tools for Parallel Web",
+  "author": "Parallel Web",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "sdk",
+    "tools",
+    "parallel"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/parallel-web/npm-packages",
+    "directory": "packages/ai-sdk-tools"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "ai": "^4.0.0",
+    "parallel-web": "^0.1.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}
