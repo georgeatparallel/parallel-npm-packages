@@ -1,0 +1,82 @@
+name: Publish Canary
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish-canary:
+    name: Publish Canary Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test:ci
+        env:
+          PARALLEL_API_KEY: ${{ secrets.PARALLEL_API_KEY }}
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Calculate canary version
+        id: version
+        run: |
+          cd packages/ai-sdk-tools
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
+          # Parse version and bump patch
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+          # Remove any pre-release suffix from patch
+          patch=${patch%%-*}
+          NEW_PATCH=$((patch + 1))
+
+          CANARY_VERSION="${major}.${minor}.${NEW_PATCH}-canary.${SHORT_SHA}"
+          echo "version=${CANARY_VERSION}" >> $GITHUB_OUTPUT
+          echo "Publishing canary version: ${CANARY_VERSION}"
+
+      - name: Configure npm authentication
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PARALLEL_DEVELOPERS_PASSWORD }}" > ~/.npmrc
+
+      - name: Publish to npm
+        run: |
+          cd packages/ai-sdk-tools
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          npm publish --tag canary --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PARALLEL_DEVELOPERS_PASSWORD }}
+
+      - name: Log published version
+        run: |
+          echo "✅ Published @parallel-web/ai-sdk-tools@${{ steps.version.outputs.version }}"
+          echo "Install with: npm install @parallel-web/ai-sdk-tools@canary"
