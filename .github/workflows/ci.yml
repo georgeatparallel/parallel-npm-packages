@@ -56,6 +56,8 @@ jobs:
 
       - name: Run tests
         run: pnpm test:ci
+        env:
+          PARALLEL_API_KEY: ${{ secrets.PARALLEL_API_KEY }}
 
   build:
     name: Build
