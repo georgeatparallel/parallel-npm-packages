@@ -48,6 +48,12 @@ export const searchTool = tool({
       .describe(
         'The maximum number of results to return. Default is 10. Optional value, do not pass if not needed.'
       ),
+    max_chars_per_result: z
+      .number()
+      .optional()
+      .describe(
+        'The maximum number of characters to return for each result. Default is 6000. Optional value, do not pass if not needed.'
+      ),
     source_policy: z
       .object({
         include_domains: z
