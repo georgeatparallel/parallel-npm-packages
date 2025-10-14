@@ -14,35 +14,55 @@ yarn add @parallel-web/ai-sdk-tools
 
 ## Usage
 
+Add `PARALLEL_API_KEY` obtained from [Parallel Platform](https://platform.parallel.ai/settings?tab=api-keys) to your environment variables.
+
+### With Vercel AI SDK
+
+The `searchTool` integrates seamlessly with Vercel's AI SDK for tool calling:
+
 ```typescript
-import { hello } from '@parallel-web/ai-sdk-tools';
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+import { searchTool } from '@parallel-web/ai-sdk-tools';
 
-console.log(hello('World')); // Hello, World!
+const result = streamText({
+  model: openai('gpt-4o'),
+  messages: [
+    { role: 'user', content: 'What are the latest developments in AI?' }
+  ],
+  tools: {
+    'web-search': searchTool,
+  },
+  toolChoice: 'auto',
+});
+
+// Stream the response
+return result.toDataStreamResponse();
 ```
 
-## Development
+### Next.js Simple Route Handler Example
 
-This package is part of the `@parallel-web` monorepo.
+```typescript
+import { openai } from '@ai-sdk/openai';
+import { streamText, convertToModelMessages } from 'ai';
+import { searchTool } from '@parallel-web/ai-sdk-tools';
 
-### Build
+export async function POST(req: Request) {
+  const { messages } = await req.json();
 
-```bash
-pnpm build
+  const result = streamText({
+    model: openai('gpt-4o'),
+    messages: convertToModelMessages(messages),
+    tools: {
+      'web-search': searchTool,
+    },
+    toolChoice: 'auto',
+  });
+
+  return result.toDataStreamResponse();
+}
 ```
 
-### Development Mode
 
-```bash
-pnpm dev
-```
 
-### Type Checking
-
-```bash
-pnpm typecheck
-```
-
-## License
-
-MIT
 
