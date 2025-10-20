@@ -30,15 +30,13 @@ describe('@parallel-web/ai-sdk-tools', () => {
     });
 
     it('should have correct tool structure', () => {
-      expect(searchTool.description).toBe(
-        'Search Tool to quickly search in websites and published/public information on the internet like news, articles, blogs, posts, products, services, etc.'
-      );
+      expect(searchTool.description).toContain('web_search_parallel');
       expect(searchTool.parameters).toBeDefined();
       expect(typeof searchTool.execute).toBe('function');
     });
 
     describe('parameter schema validation', () => {
-      it('should accept valid objective parameter', () => {
+      it('should accept valid objective parameter only', () => {
         const result = searchTool.parameters.safeParse({
           objective: 'Find latest news about AI',
         });
@@ -53,77 +51,70 @@ describe('@parallel-web/ai-sdk-tools', () => {
         expect(result.success).toBe(true);
       });
 
-      it('should accept valid processor types', () => {
-        const resultPro = searchTool.parameters.safeParse({
-          objective: 'Test query',
-          processor: 'pro',
-        });
-        expect(resultPro.success).toBe(true);
-
-        const resultBase = searchTool.parameters.safeParse({
-          objective: 'Test query',
-          processor: 'base',
-        });
-        expect(resultBase.success).toBe(true);
-      });
-
-      it('should reject invalid processor type', () => {
+      it('should accept valid search_type: list', () => {
         const result = searchTool.parameters.safeParse({
           objective: 'Test query',
-          processor: 'invalid',
+          search_type: 'list',
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should accept valid search_type: targeted', () => {
+        const result = searchTool.parameters.safeParse({
+          objective: 'Test query',
+          search_type: 'targeted',
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should accept valid search_type: general', () => {
+        const result = searchTool.parameters.safeParse({
+          objective: 'Test query',
+          search_type: 'general',
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should accept valid search_type: single_page', () => {
+        const result = searchTool.parameters.safeParse({
+          objective: 'Test query',
+          search_type: 'single_page',
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should reject invalid search_type', () => {
+        const result = searchTool.parameters.safeParse({
+          objective: 'Test query',
+          search_type: 'invalid',
         });
         expect(result.success).toBe(false);
       });
 
-      it('should accept max_results parameter', () => {
+      it('should default search_type to list when not provided', () => {
         const result = searchTool.parameters.safeParse({
           objective: 'Test query',
-          max_results: 5,
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.search_type).toBe('list');
+        }
+      });
+
+      it('should accept include_domains parameter', () => {
+        const result = searchTool.parameters.safeParse({
+          objective: 'Test query',
+          include_domains: ['example.com', 'test.org'],
         });
         expect(result.success).toBe(true);
       });
 
-      it('should accept source_policy with include_domains', () => {
-        const result = searchTool.parameters.safeParse({
-          objective: 'Test query',
-          source_policy: {
-            include_domains: ['example.com', 'test.org'],
-          },
-        });
-        expect(result.success).toBe(true);
-      });
-
-      it('should accept source_policy with exclude_domains', () => {
-        const result = searchTool.parameters.safeParse({
-          objective: 'Test query',
-          source_policy: {
-            exclude_domains: ['spam.com'],
-          },
-        });
-        expect(result.success).toBe(true);
-      });
-
-      it('should accept source_policy with both include and exclude domains', () => {
-        const result = searchTool.parameters.safeParse({
-          objective: 'Test query',
-          source_policy: {
-            include_domains: ['example.com'],
-            exclude_domains: ['spam.com'],
-          },
-        });
-        expect(result.success).toBe(true);
-      });
-
-      it('should accept all optional parameters together', () => {
+      it('should accept all parameters together', () => {
         const result = searchTool.parameters.safeParse({
           objective: 'Complex search',
           search_queries: ['query1', 'query2'],
-          processor: 'pro',
-          max_results: 10,
-          source_policy: {
-            include_domains: ['example.com'],
-            exclude_domains: ['spam.com'],
-          },
+          search_type: 'targeted',
+          include_domains: ['example.com'],
         });
         expect(result.success).toBe(true);
       });
@@ -143,12 +134,21 @@ describe('@parallel-web/ai-sdk-tools', () => {
         expect(result.success).toBe(false);
       });
 
-      it('should reject non-number max_results', () => {
+      it('should reject non-array include_domains', () => {
         const result = searchTool.parameters.safeParse({
           objective: 'Test',
-          max_results: '5',
+          include_domains: 'not an array',
         });
         expect(result.success).toBe(false);
+      });
+
+      it('should accept empty arrays for optional parameters', () => {
+        const result = searchTool.parameters.safeParse({
+          objective: 'Test query',
+          search_queries: [],
+          include_domains: [],
+        });
+        expect(result.success).toBe(true);
       });
     });
   });
@@ -164,11 +164,12 @@ describe('@parallel-web/ai-sdk-tools', () => {
       });
 
       it.concurrent(
-        'should execute basic search with objective',
+        'should execute basic search with objective (defaults to list)',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'What is artificial intelligence?',
+              search_type: 'list',
             },
             {
               toolCallId: 'test-1',
@@ -181,18 +182,20 @@ describe('@parallel-web/ai-sdk-tools', () => {
           expect(result.searchParams.objective).toBe(
             'What is artificial intelligence?'
           );
+          expect(result.searchParams.search_type).toBe('list');
           expect(result.answer).toBeDefined();
         },
         30000
-      ); // Increased timeout for API call
+      );
 
       it.concurrent(
-        'should execute search with search_queries array',
+        'should execute search with search_type: list',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'Find information about machine learning',
               search_queries: ['machine learning basics', 'ML algorithms'],
+              search_type: 'list',
             },
             {
               toolCallId: 'test-2',
@@ -201,6 +204,7 @@ describe('@parallel-web/ai-sdk-tools', () => {
           );
 
           expect(result).toBeDefined();
+          expect(result.searchParams.search_type).toBe('list');
           expect(result.searchParams.search_queries).toEqual([
             'machine learning basics',
             'ML algorithms',
@@ -211,12 +215,13 @@ describe('@parallel-web/ai-sdk-tools', () => {
       );
 
       it.concurrent(
-        'should execute search with pro processor',
+        'should execute search with search_type: targeted',
         async () => {
           const result = await searchTool.execute(
             {
-              objective: 'Energy based models in machine learning',
-              processor: 'pro',
+              objective: 'Details about energy-based models in deep learning',
+              search_type: 'targeted',
+              search_queries: ['energy-based models'],
             },
             {
               toolCallId: 'test-3',
@@ -225,19 +230,19 @@ describe('@parallel-web/ai-sdk-tools', () => {
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams.processor).toBe('pro');
+          expect(result.searchParams.search_type).toBe('targeted');
           expect(result.answer).toBeDefined();
         },
         30000
       );
 
       it.concurrent(
-        'should execute search with base processor',
+        'should execute search with search_type: general',
         async () => {
           const result = await searchTool.execute(
             {
-              objective: 'REI location near SOMA, San Francisco',
-              processor: 'base',
+              objective: 'REI locations in San Francisco',
+              search_type: 'general',
             },
             {
               toolCallId: 'test-4',
@@ -246,19 +251,20 @@ describe('@parallel-web/ai-sdk-tools', () => {
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams.processor).toBe('base');
+          expect(result.searchParams.search_type).toBe('general');
           expect(result.answer).toBeDefined();
         },
         30000
       );
 
       it.concurrent(
-        'should respect max_results parameter',
+        'should execute search with search_type: single_page',
         async () => {
           const result = await searchTool.execute(
             {
-              objective: 'Top burger joints in Tokyo',
-              max_results: 3,
+              objective:
+                'Extract content from Wikipedia page about search engines at https://en.wikipedia.org/wiki/Search_engine',
+              search_type: 'single_page',
             },
             {
               toolCallId: 'test-5',
@@ -267,21 +273,20 @@ describe('@parallel-web/ai-sdk-tools', () => {
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams.max_results).toBe(3);
+          expect(result.searchParams.search_type).toBe('single_page');
           expect(result.answer).toBeDefined();
         },
         30000
       );
 
       it.concurrent(
-        'should execute search with include_domains in source_policy',
+        'should execute search with include_domains',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'Information about search engines',
-              source_policy: {
-                include_domains: ['wikipedia.org'],
-              },
+              search_type: 'list',
+              include_domains: ['wikipedia.org'],
             },
             {
               toolCallId: 'test-6',
@@ -290,8 +295,7 @@ describe('@parallel-web/ai-sdk-tools', () => {
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams.source_policy).toBeDefined();
-          expect(result.searchParams.source_policy?.include_domains).toEqual([
+          expect(result.searchParams.include_domains).toEqual([
             'wikipedia.org',
           ]);
           expect(result.answer).toBeDefined();
@@ -300,14 +304,14 @@ describe('@parallel-web/ai-sdk-tools', () => {
       );
 
       it.concurrent(
-        'should execute search with exclude_domains in source_policy',
+        'should execute search with multiple include_domains and targeted search',
         async () => {
           const result = await searchTool.execute(
             {
-              objective: 'General technology news',
-              source_policy: {
-                exclude_domains: ['example.com'],
-              },
+              objective: 'Best trail running shoes',
+              search_type: 'targeted',
+              search_queries: ['trail running shoes reviews'],
+              include_domains: ['rei.com', 'backcountry.com'],
             },
             {
               toolCallId: 'test-7',
@@ -316,9 +320,10 @@ describe('@parallel-web/ai-sdk-tools', () => {
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams.source_policy).toBeDefined();
-          expect(result.searchParams.source_policy?.exclude_domains).toEqual([
-            'example.com',
+          expect(result.searchParams.search_type).toBe('targeted');
+          expect(result.searchParams.include_domains).toEqual([
+            'rei.com',
+            'backcountry.com',
           ]);
           expect(result.answer).toBeDefined();
         },
@@ -334,6 +339,7 @@ describe('@parallel-web/ai-sdk-tools', () => {
           const searchPromise = searchTool.execute(
             {
               objective: 'Long running query about complex topics',
+              search_type: 'list',
             },
             {
               abortSignal: abortController.signal,
@@ -351,22 +357,16 @@ describe('@parallel-web/ai-sdk-tools', () => {
       );
 
       it.concurrent(
-        'should execute search with all parameters',
+        'should execute list search for broad aggregation',
         async () => {
           const result = await searchTool.execute(
             {
-              objective: 'La Sportiva Ultra Raptor II',
+              objective: 'Latest news about AI startups',
+              search_type: 'list',
               search_queries: [
-                'La Sportiva Ultra Raptor reviews',
-                'La Sportiva Ultra Raptor Two',
-                'La Sportiva Ultra Raptor 2 review',
+                'AI startups 2024',
+                'artificial intelligence companies',
               ],
-              processor: 'pro',
-              max_results: 5,
-              source_policy: {
-                include_domains: ['rei.com'],
-                exclude_domains: ['spam.com'],
-              },
             },
             {
               toolCallId: 'test-9',
@@ -376,19 +376,35 @@ describe('@parallel-web/ai-sdk-tools', () => {
 
           expect(result).toBeDefined();
           expect(result.searchParams).toMatchObject({
-            objective: 'La Sportiva Ultra Raptor II',
+            objective: 'Latest news about AI startups',
+            search_type: 'list',
             search_queries: [
-              'La Sportiva Ultra Raptor reviews',
-              'La Sportiva Ultra Raptor Two',
-              'La Sportiva Ultra Raptor 2 review',
+              'AI startups 2024',
+              'artificial intelligence companies',
             ],
-            processor: 'pro',
-            max_results: 5,
-            source_policy: {
-              include_domains: ['rei.com'],
-              exclude_domains: ['spam.com'],
-            },
           });
+          expect(result.answer).toBeDefined();
+        },
+        30000
+      );
+
+      it.concurrent(
+        'should execute general search for catch-all queries',
+        async () => {
+          const result = await searchTool.execute(
+            {
+              objective: 'Top burger joints in Tokyo',
+              search_type: 'general',
+              search_queries: ['best burgers Tokyo'],
+            },
+            {
+              toolCallId: 'test-10',
+              messages: [],
+            }
+          );
+
+          expect(result).toBeDefined();
+          expect(result.searchParams.search_type).toBe('general');
           expect(result.answer).toBeDefined();
         },
         30000
