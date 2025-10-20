@@ -69,7 +69,7 @@ export async function POST(req: Request) {
 
 ### Scaffolded Tools
 
-If your tool-calling LLM doesn't choose the right arguments for the searchTool, you may scaffold it or create another one to your own liking. Here's an example of a `simpleCompactSearchTool` that returns smaller snippets, with max of 10 results, for simple queries.
+If your tool-calling LLM doesn't choose the right arguments for the searchTool, you may scaffold it further or create another one to your own liking. Here's an example of a `webSearch` that returns smaller snippets, with max of 3 results, for simple queries.
 
 ```typescript
 import { tool } from 'ai';
@@ -80,46 +80,44 @@ const parallel = new Parallel({
   apiKey: process.env.PARALLEL_API_KEY,
 });
 
-// Custom scaffolded search tool with constrained parameters
-export const simpleCompactSearchTool = tool({
-  description: 'Compact search tool that returns concise results from web searches.',
-  parameters: z.object({
-    objective: z
-      .string()
-      .describe('What you are trying to find with this search'),
-    search_queries: z
+// Custom
+const webSearch = tool({
+  description: 'Use this tool to search the web.',
+  inputSchema: z.object({
+    searchQueries: z
       .array(z.string())
-      .optional()
-      .describe('Optional keyword search queries'),
+      .describe(
+        "Array (max 3) of search queries to help answer the user's question",
+      ),
+    usersQuestion: z.string().describe("The user's question phrased as an objective."),
   }),
-  execute: async ({ objective, search_queries }, { abortSignal }) => {
-    const results = await parallel.beta.search(
-      {
-        objective,
-        search_queries,
-        max_results: 10, // Fixed at 10 results
-        max_chars_per_result: 500, // Smaller snippets (500 chars vs default 6000)
-        processor: 'base', // Use base processor for faster responses
-      },
-      { signal: abortSignal }
-    );
-
-    return {
-      searchParams: { objective, search_queries },
-      answer: results,
-    };
+  execute: async ({ searchQueries, usersQuestion }) => {
+    const search = await client.beta.search({
+      objective: usersQuestion,
+      search_queries: searchQueries,
+      processor: 'base',
+      max_results: 3,
+      max_chars_per_result: 1000,
+    });
+    return search.results;
   },
 });
 
-// Usage in your route
-const result = streamText({
-  model: openai('gpt-4o'),
-  messages,
-  tools: {
-    'simple-web-search-with-compact-results': simpleCompactSearchTool,
-  },
-  toolChoice: 'auto',
-});
+async function main() {
+  const { text, steps } = await generateText({
+    model: 'openai/gpt-4o',
+    prompt: 'What was Geoff Hinton\'s last publication?',
+    tools: {
+      webSearch,
+    },
+    stopWhen: stepCountIs(5), // run for up to 5 steps
+  });
+
+  console.log(text);
+  console.dir(steps, { depth: null });
+}
+
+main().catch(console.error);
 ```
 
 
