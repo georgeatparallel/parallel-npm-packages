@@ -13,6 +13,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./v4": {
+      "types": "./dist/v4.d.ts",
+      "import": "./dist/v4.js",
+      "require": "./dist/v4.cjs"
+    },
+    "./v5": {
+      "types": "./dist/v5.d.ts",
+      "import": "./dist/v5.js",
+      "require": "./dist/v5.cjs"
     }
   },
   "files": [
@@ -41,8 +51,9 @@
     "access": "public"
   },
   "dependencies": {
-    "ai": "^4.0.0",
-    "parallel-web": "^0.1.0",
+    "ai-v4": "npm:ai@^4.0.0",
+    "ai-v5": "npm:ai@^5.0.0",
+    "parallel-web": "^0.2.1",
     "zod": "^3.23.0"
   },
   "devDependencies": {

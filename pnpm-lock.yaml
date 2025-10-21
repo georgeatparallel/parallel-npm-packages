@@ -35,12 +35,15 @@ importers:
 
   packages/ai-sdk-tools:
     dependencies:
-      ai:
-        specifier: ^4.0.0
-        version: 4.3.19(react@19.2.0)(zod@3.25.76)
+      ai-v4:
+        specifier: npm:ai@^4.0.0
+        version: ai@4.3.19(react@19.2.0)(zod@3.25.76)
+      ai-v5:
+        specifier: npm:ai@^5.0.0
+        version: ai@5.0.76(zod@3.25.76)
       parallel-web:
-        specifier: ^0.1.0
-        version: 0.1.1
+        specifier: ^0.2.1
+        version: 0.2.1
       zod:
         specifier: ^3.23.0
         version: 3.25.76
@@ -51,14 +54,30 @@ importers:
 
 packages:
 
+  '@ai-sdk/gateway@2.0.0':
+    resolution: {integrity: sha512-Gj0PuawK7NkZuyYgO/h5kDK/l6hFOjhLdTq3/Lli1FTl47iGmwhH1IZQpAL3Z09BeFYWakcwUmn02ovIm2wy9g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider-utils@2.2.8':
     resolution: {integrity: sha512-fqhG+4sCVv8x7nFzYnFo19ryhAa3w096Kmc3hWxMQfW/TubPOmt3A6tYZhl4mUfQWWQMsuSkLrtjlWuXBVSGQA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.23.8
 
+  '@ai-sdk/provider-utils@3.0.12':
+    resolution: {integrity: sha512-ZtbdvYxdMoria+2SlNarEk6Hlgyf+zzcznlD55EAl+7VZvJaSg2sqPvwArY7L6TfDEDJsnCq0fdhBSkYo0Xqdg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@1.1.3':
     resolution: {integrity: sha512-qZMxYJ0qqX/RfnuIaab+zp8UAeJn/ygXXAffR5I4N0n1IrvA6qBsjc8hXLmBiMV2zoXlifkacF7sEFnYnjBcqg==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@2.0.0':
+    resolution: {integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==}
     engines: {node: '>=18'}
 
   '@ai-sdk/react@1.2.12':
@@ -556,6 +575,9 @@ packages:
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
 
+  '@standard-schema/spec@1.0.0':
+    resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
+
   '@types/diff-match-patch@1.0.36':
     resolution: {integrity: sha512-xFdR6tkm0MWvBfO8xXCSsinYxHcqkQUlcHeSpMC2ukzOb6lwQAfDmW+Qt0AvlGd8HpsS28qKsB+oPeJn9I39jg==}
 
@@ -632,6 +654,10 @@ packages:
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
 
+  '@vercel/oidc@3.0.3':
+    resolution: {integrity: sha512-yNEQvPcVrK9sIe637+I0jD6leluPxzwJKx/Haw6F4H77CdDsszUn5V3o96LPziXkSNE2B83+Z3mjqGKBK/R6Gg==}
+    engines: {node: '>= 20'}
+
   '@vitest/expect@1.6.1':
     resolution: {integrity: sha512-jXL+9+ZNIJKruofqXuuTClf44eSpcHlgj3CiuNihUF3Ioujtmc0zIa3UJOW5RjDK1YLBJZnWBlPuqhYycLioog==}
 
@@ -670,6 +696,12 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  ai@5.0.76:
+    resolution: {integrity: sha512-ZCxi1vrpyCUnDbtYrO/W8GLvyacV9689f00yshTIQ3mFFphbD7eIv40a2AOZBv3GGRA7SSRYIDnr56wcS/gyQg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
@@ -872,6 +904,10 @@ packages:
   esutils@2.0.3:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
+
+  eventsource-parser@3.0.6:
+    resolution: {integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==}
+    engines: {node: '>=18.0.0'}
 
   execa@8.0.1:
     resolution: {integrity: sha512-VyhnebXciFV2DESc+p6B+y0LjSm0krU4OgJN44qFAhBY0TJ+1V61tYD2+wHusZ6F9n5K+vl8k0sTy7PEfV4qpg==}
@@ -1177,8 +1213,8 @@ packages:
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
 
-  parallel-web@0.1.1:
-    resolution: {integrity: sha512-RxuBjii9VuBruU8ryI3VNFZNUiJ0hY1dRw5Kj9nIChVSNBlS0K+Mb4UyDuPUMJL2kXIb8cyIIKMvDQSVYj2Xdg==}
+  parallel-web@0.2.1:
+    resolution: {integrity: sha512-WJgEN92xdS+u8U0J7WXlltZHDZ6SDHJeJL1CYgZ+JQgJNwxhFKdIlawVkUL++EyGPSMu+lE8u/zsxDXtoxMryQ==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -1607,6 +1643,13 @@ packages:
 
 snapshots:
 
+  '@ai-sdk/gateway@2.0.0(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.12(zod@3.25.76)
+      '@vercel/oidc': 3.0.3
+      zod: 3.25.76
+
   '@ai-sdk/provider-utils@2.2.8(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
@@ -1614,7 +1657,18 @@ snapshots:
       secure-json-parse: 2.7.0
       zod: 3.25.76
 
+  '@ai-sdk/provider-utils@3.0.12(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 3.25.76
+
   '@ai-sdk/provider@1.1.3':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@2.0.0':
     dependencies:
       json-schema: 0.4.0
 
@@ -1929,6 +1983,8 @@ snapshots:
 
   '@sinclair/typebox@0.27.8': {}
 
+  '@standard-schema/spec@1.0.0': {}
+
   '@types/diff-match-patch@1.0.36': {}
 
   '@types/estree@1.0.8': {}
@@ -2029,6 +2085,8 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
+  '@vercel/oidc@3.0.3': {}
+
   '@vitest/expect@1.6.1':
     dependencies:
       '@vitest/spy': 1.6.1
@@ -2079,6 +2137,14 @@ snapshots:
       zod: 3.25.76
     optionalDependencies:
       react: 19.2.0
+
+  ai@5.0.76(zod@3.25.76):
+    dependencies:
+      '@ai-sdk/gateway': 2.0.0(zod@3.25.76)
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.12(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      zod: 3.25.76
 
   ajv@6.12.6:
     dependencies:
@@ -2334,6 +2400,8 @@ snapshots:
       '@types/estree': 1.0.8
 
   esutils@2.0.3: {}
+
+  eventsource-parser@3.0.6: {}
 
   execa@8.0.1:
     dependencies:
@@ -2634,7 +2702,7 @@ snapshots:
 
   package-json-from-dist@1.0.1: {}
 
-  parallel-web@0.1.1: {}
+  parallel-web@0.2.1: {}
 
   parent-module@1.0.1:
     dependencies:

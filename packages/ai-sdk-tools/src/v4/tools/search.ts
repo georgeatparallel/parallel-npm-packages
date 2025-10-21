@@ -1,11 +1,11 @@
 /**
- * Search tool for Parallel Web (AI SDK v5)
+ * Search tool for Parallel Web (AI SDK v4)
  */
 
-import { tool } from 'ai-v5';
+import { tool, type Tool as ToolV4 } from 'ai-v4';
 import { z } from 'zod';
 import { BetaSearchParams } from 'parallel-web/resources/beta/beta.mjs';
-import { parallelClient } from '../client.js';
+import { parallelClient } from '../../client.js';
 
 function getSearchParams(
   search_type: 'list' | 'targeted' | 'general' | 'single_page'
@@ -33,11 +33,12 @@ const search = async (
     },
     {
       signal: abortSignal,
+      // headers: { 'parallel-beta': 'search-extract-2025-10-10' },
     }
   );
 };
 
-export const searchTool = tool({
+export const searchTool: ToolV4 = tool({
   description: `Use the web_search_parallel tool to access information from the web. The
 web_search_parallel tool returns ranked, extended web excerpts optimized for LLMs.
 Intelligently scale the number of web_search_parallel tool calls to get more information
@@ -57,7 +58,7 @@ How to use:
 - For simple queries, a one-shot call to depth is usually sufficient.
 - For complex multi-hop queries, first try to use breadth to narrow down sources. Then
 use other search types with include_domains to get more detailed results.`,
-  inputSchema: z.object({
+  parameters: z.object({
     objective: z.string().describe(
       `Natural-language description of what the web research goal
  is. Specify the broad intent of the search query here. Also include any source or
@@ -95,7 +96,10 @@ use other search types with include_domains to get more detailed results.`,
  sources. example: ["google.com", "wikipedia.org"]. Maximum 10 entries.`),
   }),
 
-  execute: async function ({ ...args }, { abortSignal }) {
+  execute: async function (
+    { ...args },
+    { abortSignal }: { abortSignal?: AbortSignal }
+  ) {
     const results = await search(
       { ...args, ...getSearchParams(args.search_type) },
       { abortSignal }
