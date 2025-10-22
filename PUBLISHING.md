@@ -30,17 +30,95 @@ This repository uses two automated workflows for publishing packages to npm:
 
 **Trigger**: Manual via GitHub Actions UI
 
+**Prerequisites**:
+1. Version must be manually bumped in `package.json` via a PR
+2. PR must be merged to `main` before triggering the workflow
+
 **Process**:
-1. Runs full CI suite
-2. Bumps version in `package.json` based on input (patch/minor/major)
-3. Generates changelog from conventional commits
-4. Commits version bump with message: `chore: release v{version}`
+1. Runs full CI suite (lint, format check, typecheck, tests, build)
+2. Reads current version from `package.json`
+3. Verifies that version tag doesn't already exist
+4. Generates changelog from conventional commits since last tag
 5. Creates git tag: `v{version}`
-6. Pushes commit and tag to `main`
+6. Pushes tag to repository (no commits to `main`)
 7. Publishes to npm with `--tag latest`
 8. Creates GitHub Release with changelog
 
-**Result**: New stable version published and tagged in git
+**Result**: New stable version published and tagged in git (no version bump commits)
+
+## How to Create a Stable Release
+
+Follow these steps to publish a new stable version:
+
+### Step 1: Create a Release PR
+
+1. Create a new branch from `main`:
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b release/v0.2.0  # Use the new version number
+   ```
+
+2. Bump the version in `packages/ai-sdk-tools/package.json`:
+   ```bash
+   cd packages/ai-sdk-tools
+   npm version patch  # or 'minor' or 'major'
+   # This updates package.json and pnpm-lock.yaml
+   ```
+   
+   Or manually edit `package.json` to set the desired version.
+
+3. Commit the version bump:
+   ```bash
+   git add .
+   git commit -m "chore: bump version to v0.2.0"
+   ```
+
+4. Push the branch and create a PR:
+   ```bash
+   git push origin release/v0.2.0
+   ```
+
+5. Create a PR with title: `chore: release v0.2.0`
+
+6. Wait for CI to pass and get the PR reviewed/approved
+
+7. Merge the PR to `main`
+
+### Step 2: Trigger the Publish Workflow
+
+1. Go to the [Actions tab](https://github.com/shapleyai/parallel-web-npm-packages/actions)
+
+2. Select "Publish Stable Release" workflow
+
+3. Click "Run workflow"
+
+4. Select `main` branch
+
+5. Check the confirmation checkbox
+
+6. Click "Run workflow"
+
+### Step 3: Verify the Release
+
+The workflow will:
+- Run all tests and checks
+- Create a git tag (e.g., `v0.2.0`)
+- Publish to npm as `@parallel-web/ai-sdk-tools@0.2.0`
+- Create a GitHub Release with auto-generated changelog
+
+Verify the release:
+```bash
+# Check npm
+npm view @parallel-web/ai-sdk-tools version
+
+# Check git tags
+git fetch --tags
+git tag -l
+
+# Check GitHub Releases
+# Visit: https://github.com/shapleyai/parallel-web-npm-packages/releases
+```
 
 ## Testing the Workflows
 
@@ -94,53 +172,55 @@ If you're confident:
 
 ### Testing Stable Publishing
 
-#### Option 1: Dry Run First
+#### Option 1: Dry Run on a Test Branch
 
-Modify the workflow to add dry-run mode:
+Test the entire workflow without affecting main:
 
-1. Add input parameter:
-```yaml
-inputs:
-  dry-run:
-    description: 'Dry run (do not actually publish)'
-    required: false
-    type: boolean
-    default: false
+1. Create a test branch:
+```bash
+git checkout -b test-release
 ```
 
-2. Modify publish step:
-```yaml
-- name: Publish to npm
-  run: |
-    cd packages/ai-sdk-tools
-    if [ "${{ inputs.dry-run }}" = "true" ]; then
-      npm publish --dry-run --tag latest --access public
-    else
-      npm publish --tag latest --access public
-    fi
+2. Bump version to a test version:
+```bash
+cd packages/ai-sdk-tools
+npm version 0.0.0-test.1 --no-git-tag-version
+git add package.json
+git commit -m "test: version bump"
+git push origin test-release
 ```
 
-#### Option 2: Test Version Bumping Only
+3. Temporarily modify `.github/workflows/publish-stable.yml` to:
+   - Trigger on push to `test-release` branch
+   - Add `--dry-run` flag to npm publish step
 
-Comment out the publish and push steps temporarily:
+4. Push and observe the workflow run
 
-```yaml
-# - name: Push changes
-#   run: |
-#     git push origin main
+#### Option 2: Manual Local Testing
 
-# - name: Publish to npm
-#   run: |
-#     cd packages/ai-sdk-tools
-#     npm publish --tag latest --access public
+Test the release process locally before running in CI:
+
+```bash
+# Simulate the workflow steps
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm test:ci
+pnpm build
+
+# Test version reading
+cd packages/ai-sdk-tools
+VERSION=$(node -p "require('./package.json').version")
+echo "Version: $VERSION"
+
+# Test tag creation (don't push)
+git tag -a "v${VERSION}-test" -m "Test release"
+git tag -d "v${VERSION}-test"  # Clean up
+
+# Test npm publish (dry run)
+npm publish --dry-run --tag latest --access public
 ```
-
-This lets you test:
-- Version calculation
-- Changelog generation
-- Git operations
-
-Without actually publishing or modifying the repository.
 
 #### Option 3: Test on a Fork
 
@@ -151,14 +231,16 @@ Without actually publishing or modifying the repository.
 
 ### Validation Checklist
 
-Before running workflows in production:
+Before publishing a stable release:
 
-- [ ] npm token is set correctly in GitHub secrets
-- [ ] Token has correct permissions (publish access to `@parallel-web/ai-sdk-tools`)
-- [ ] Current `package.json` version is correct (e.g., `0.1.0`)
+- [ ] Version bumped in `packages/ai-sdk-tools/package.json`
+- [ ] Version follows semantic versioning (e.g., `0.2.0`)
+- [ ] Version doesn't already have a git tag
+- [ ] Release PR merged to `main`
 - [ ] All tests pass locally: `pnpm test:ci`
 - [ ] Build succeeds: `pnpm build`
-- [ ] Git user email is correct in workflow: `developers@parallel.ai`
+- [ ] npm token is set correctly in GitHub secrets (`NPM_PARALLEL_DEVELOPERS_PASSWORD`)
+- [ ] Token has correct permissions (publish access to `@parallel-web/ai-sdk-tools`)
 
 ## Setup Instructions
 
@@ -204,13 +286,15 @@ You can verify this by checking the npm organization settings.
 2. Check organization membership for `developers@parallel.ai`
 3. Regenerate token if needed
 
-### Git push fails in stable workflow
+### Tag already exists error
 
-**Cause**: Branch protection rules may prevent bot from pushing.
+**Cause**: The version in `package.json` already has a corresponding git tag.
 
 **Solution**: 
-- Add GitHub Actions bot to branch protection bypass list, OR
-- Use a Personal Access Token (PAT) with repo permissions instead of `GITHUB_TOKEN`
+1. Check existing tags: `git tag -l`
+2. Bump the version in `package.json` to a new version
+3. Create a new release PR with the updated version
+4. Merge and re-run the workflow
 
 ### Changelog is empty
 
@@ -281,13 +365,15 @@ https://github.com/parallel-web/npm-packages/actions
 ## Best Practices
 
 1. **Always use conventional commits** for automatic changelog generation
-2. **Test canary versions** before promoting to stable
-3. **Review changelog** before stable releases
-4. **Use patch** for backwards-compatible bug fixes
-5. **Use minor** for new features (backwards-compatible)
-6. **Use major** for breaking changes
-7. **Keep main branch stable** - all tests should pass
-8. **Monitor npm download stats** to understand usage
+2. **Create release PRs** to bump versions - never commit directly to main
+3. **Test canary versions** before promoting to stable
+4. **Review changelog preview** in workflow logs before GitHub Release creation
+5. **Use patch** for backwards-compatible bug fixes (0.1.0 → 0.1.1)
+6. **Use minor** for new features that are backwards-compatible (0.1.0 → 0.2.0)
+7. **Use major** for breaking changes (0.1.0 → 1.0.0)
+8. **Keep main branch stable** - all tests should pass before merging
+9. **Tag naming convention** - all tags should be prefixed with `v` (e.g., `v0.2.0`)
+10. **Monitor npm download stats** to understand usage patterns
 
 ## Security Considerations
 
@@ -298,6 +384,8 @@ https://github.com/parallel-web/npm-packages/actions
 - ✅ Full CI validation before every publish
 - ✅ Git tags provide immutable release history
 - ✅ Conventional commits provide audit trail
+- ✅ Version changes require PR review (respects branch protection)
+- ✅ No automated commits to main branch (tag-only workflow)
 
 ## Emergency Procedures
 
