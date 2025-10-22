@@ -2,10 +2,10 @@
  * Search tool for Parallel Web (AI SDK v5)
  */
 
-import { tool } from 'ai-v5';
+import { tool, type Tool as ToolV5 } from 'ai-v5';
 import { z } from 'zod';
 import { BetaSearchParams } from 'parallel-web/resources/beta/beta.mjs';
-import { parallelClient } from '../client.js';
+import { parallelClient } from '../../client.js';
 
 function getSearchParams(
   search_type: 'list' | 'targeted' | 'general' | 'single_page'
@@ -33,11 +33,12 @@ const search = async (
     },
     {
       signal: abortSignal,
+      // headers: { 'parallel-beta': 'search-extract-2025-10-10' },
     }
   );
 };
 
-export const searchTool = tool({
+export const searchTool: ToolV5 = tool({
   description: `Use the web_search_parallel tool to access information from the web. The
 web_search_parallel tool returns ranked, extended web excerpts optimized for LLMs.
 Intelligently scale the number of web_search_parallel tool calls to get more information

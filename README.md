@@ -74,9 +74,9 @@ pnpm --filter @parallel-web/ai-sdk-tools test
 
 Packages are published to npm using automated GitHub Actions workflows.
 
-### Canary Releases (Automated)
+### Canary Releases 
 
-Every push to `main` automatically publishes a canary release with version format `x.y.z-canary.{shortSHA}`.
+Every push to `main` can be published to a canary release with version format `x.y.z-canary.{shortSHA}`.
 
 - Published with the `canary` npm dist-tag
 - Does not modify `package.json` in git
