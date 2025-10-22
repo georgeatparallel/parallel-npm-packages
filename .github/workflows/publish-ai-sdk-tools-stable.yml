@@ -1,4 +1,4 @@
-name: Publish Stable Release
+name: Publish ai-sdk-tools Stable
 
 on:
   workflow_dispatch:
@@ -10,12 +10,12 @@ on:
         default: false
 
 concurrency:
-  group: publish-stable
+  group: publish-ai-sdk-tools-stable
   cancel-in-progress: false
 
 jobs:
-  publish-stable:
-    name: Publish Stable Release
+  publish-ai-sdk-tools-stable:
+    name: Publish ai-sdk-tools Stable Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,22 +40,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+      - name: Lint ai-sdk-tools
+        run: pnpm eslint packages/ai-sdk-tools
 
-      - name: Format check
-        run: pnpm format:check
+      - name: Format check ai-sdk-tools
+        run: pnpm prettier --check packages/ai-sdk-tools
 
-      - name: Type check
-        run: pnpm typecheck
+      - name: Type check ai-sdk-tools
+        run: |
+          cd packages/ai-sdk-tools
+          pnpm typecheck
 
-      - name: Run tests
-        run: pnpm test:ci
+      - name: Run tests for ai-sdk-tools
+        run: |
+          cd packages/ai-sdk-tools
+          pnpm test
         env:
           PARALLEL_API_KEY: ${{ secrets.PARALLEL_API_KEY }}
 
-      - name: Build packages
-        run: pnpm build
+      - name: Build ai-sdk-tools
+        run: |
+          cd packages/ai-sdk-tools
+          pnpm build
 
       - name: Configure git
         run: |

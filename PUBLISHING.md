@@ -4,21 +4,33 @@ This document provides detailed information about the npm publishing workflows a
 
 ## Overview
 
-This repository uses two automated workflows for publishing packages to npm:
+This repository uses package-specific workflows for publishing to npm. Each package has its own dedicated workflows:
 
-1. **Canary Publishing**: Automatically publishes pre-release versions on every push to `main`
+1. **Canary Publishing**: Manually triggered to publish pre-release versions
 2. **Stable Publishing**: Manually triggered to publish stable releases
+
+**Current packages:**
+- `@parallel-web/ai-sdk-tools` - AI SDK tools for Parallel Web
+
+**Note**: This monorepo is designed to support multiple packages. When adding new packages, create dedicated workflows following the naming pattern: `publish-{package-name}-canary.yml` and `publish-{package-name}-stable.yml`.
 
 ## Workflow Architecture
 
-### Canary Workflow (`.github/workflows/publish-canary.yml`)
+### Canary Workflow (`.github/workflows/publish-ai-sdk-tools-canary.yml`)
 
-**Trigger**: Automatically on push to `main`
+**Package**: `@parallel-web/ai-sdk-tools`
+
+**Trigger**: Manual via GitHub Actions UI
 
 **Process**:
-1. Runs full CI suite (lint, format check, typecheck, tests, build)
+1. Runs package-specific CI suite:
+   - Lints `packages/ai-sdk-tools`
+   - Format checks `packages/ai-sdk-tools`
+   - Type checks `packages/ai-sdk-tools`
+   - Runs tests for `packages/ai-sdk-tools`
+   - Builds `packages/ai-sdk-tools`
 2. Calculates canary version by:
-   - Reading current version from `package.json` (e.g., `1.2.3`)
+   - Reading current version from `packages/ai-sdk-tools/package.json` (e.g., `1.2.3`)
    - Bumping patch version (e.g., `1.2.4`)
    - Appending `-canary.{shortSHA}` (e.g., `1.2.4-canary.abc1234`)
 3. Publishes to npm with `--tag canary`
@@ -26,17 +38,24 @@ This repository uses two automated workflows for publishing packages to npm:
 
 **Result**: Package available as `@parallel-web/ai-sdk-tools@canary`
 
-### Stable Workflow (`.github/workflows/publish-stable.yml`)
+### Stable Workflow (`.github/workflows/publish-ai-sdk-tools-stable.yml`)
+
+**Package**: `@parallel-web/ai-sdk-tools`
 
 **Trigger**: Manual via GitHub Actions UI
 
 **Prerequisites**:
-1. Version must be manually bumped in `package.json` via a PR
+1. Version must be manually bumped in `packages/ai-sdk-tools/package.json` via a PR
 2. PR must be merged to `main` before triggering the workflow
 
 **Process**:
-1. Runs full CI suite (lint, format check, typecheck, tests, build)
-2. Reads current version from `package.json`
+1. Runs package-specific CI suite:
+   - Lints `packages/ai-sdk-tools`
+   - Format checks `packages/ai-sdk-tools`
+   - Type checks `packages/ai-sdk-tools`
+   - Runs tests for `packages/ai-sdk-tools`
+   - Builds `packages/ai-sdk-tools`
+2. Reads current version from `packages/ai-sdk-tools/package.json`
 3. Verifies that version tag doesn't already exist
 4. Generates changelog from conventional commits since last tag
 5. Creates git tag: `v{version}`
@@ -89,7 +108,7 @@ Follow these steps to publish a new stable version:
 
 1. Go to the [Actions tab](https://github.com/shapleyai/parallel-web-npm-packages/actions)
 
-2. Select "Publish Stable Release" workflow
+2. Select "Publish ai-sdk-tools Stable" workflow
 
 3. Click "Run workflow"
 
@@ -135,7 +154,7 @@ git tag -l
 Modify the workflow temporarily to test without affecting main:
 
 ```yaml
-# In .github/workflows/publish-canary.yml
+# In .github/workflows/publish-ai-sdk-tools-canary.yml
 on:
   push:
     branches: [main, test-canary]  # Add test branch
@@ -167,7 +186,7 @@ This shows what would be published without actually publishing.
 If you're confident:
 1. Make any commit to main
 2. Push to GitHub
-3. Watch Actions tab for "Publish Canary" workflow
+3. Watch Actions tab for "Publish ai-sdk-tools Canary" workflow
 4. Check npm registry: `npm view @parallel-web/ai-sdk-tools@canary`
 
 ### Testing Stable Publishing
@@ -190,7 +209,7 @@ git commit -m "test: version bump"
 git push origin test-release
 ```
 
-3. Temporarily modify `.github/workflows/publish-stable.yml` to:
+3. Temporarily modify `.github/workflows/publish-ai-sdk-tools-stable.yml` to:
    - Trigger on push to `test-release` branch
    - Add `--dry-run` flag to npm publish step
 
