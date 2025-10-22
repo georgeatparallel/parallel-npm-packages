@@ -1,46 +1,16 @@
 # @parallel-web/ai-sdk-tools
 
-AI SDK tools for Parallel Web with support for both AI SDK v4 and v5.
+AI-SDK tools for Parallel Web with support for Vercel's AI-SDK v4 and v5.
 
 ## Installation
 
 ```bash
-npm install @parallel-web/ai-sdk-tools ai
+npm install ai @parallel-web/ai-sdk-tools
 # or
-pnpm add @parallel-web/ai-sdk-tools ai
+pnpm add ai @parallel-web/ai-sdk-tools
 # or
-yarn add @parallel-web/ai-sdk-tools ai
+yarn add ai @parallel-web/ai-sdk-tools
 ```
-
-**Note:** This package includes both AI SDK v4 and v5 support via package aliases.
-
-## Version Compatibility
-
-**This package supports both AI SDK v4 and v5!** 
-
-Using npm package aliases, we bundle both `ai@4.x` and `ai@5.x` within the same package, providing genuine compatibility for both versions.
-
-### Choose Your Version
-
-- **AI SDK v5 (Default/Recommended)**
-  ```typescript
-  import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools';
-  // or explicitly
-  import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools/v5';
-  ```
-
-- **AI SDK v4**
-  ```typescript
-  import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools/v4';
-  ```
-
-### How It Works
-
-The package uses npm package aliases to install both versions:
-- `ai-v4`: Maps to `ai@^4.0.0` (uses `parameters` API)
-- `ai-v5`: Maps to `ai@^5.0.0` (uses `inputSchema` API)
-
-Each version has its own implementation that imports from the appropriate aliased package, ensuring **100% real compatibility** with both SDK versions.
 
 ## Usage
 
@@ -54,8 +24,8 @@ Add `PARALLEL_API_KEY` obtained from [Parallel Platform](https://platform.parall
 
 ```typescript
 import { openai } from '@ai-sdk/openai';
-import { streamText } from 'ai';
-import { searchTool } from '@parallel-web/ai-sdk-tools';
+import { streamText, type Tool } from 'ai';
+import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools';
 
 const result = streamText({
   model: openai('gpt-4o'),
@@ -63,7 +33,8 @@ const result = streamText({
     { role: 'user', content: 'What are the latest developments in AI?' }
   ],
   tools: {
-    'web-search': searchTool,
+    'web-search': searchTool as Tool,
+    'web-extract': extractTool as Tool,
   },
   toolChoice: 'auto',
 });
@@ -76,8 +47,8 @@ return result.toDataStreamResponse();
 
 ```typescript
 import { openai } from '@ai-sdk/openai';
-import { streamText } from 'ai';
-import { searchTool } from '@parallel-web/ai-sdk-tools/v4';
+import { streamText, type Tool } from 'ai';
+import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools/v4';
 
 const result = streamText({
   model: openai('gpt-4o'),
@@ -85,7 +56,8 @@ const result = streamText({
     { role: 'user', content: 'What are the latest developments in AI?' }
   ],
   tools: {
-    'web-search': searchTool,
+    'web-search': searchTool as Tool,
+    'web-extract': extractTool as Tool,
   },
   toolChoice: 'auto',
 });
@@ -94,28 +66,6 @@ const result = streamText({
 return result.toDataStreamResponse();
 ```
 
-### Next.js Simple Route Handler Example
-
-```typescript
-import { openai } from '@ai-sdk/openai';
-import { streamText, convertToModelMessages } from 'ai';
-import { searchTool } from '@parallel-web/ai-sdk-tools';
-
-export async function POST(req: Request) {
-  const { messages } = await req.json();
-
-  const result = streamText({
-    model: openai('gpt-4o'),
-    messages: convertToModelMessages(messages),
-    tools: {
-      'web-search': searchTool,
-    },
-    toolChoice: 'auto',
-  });
-
-  return result.toDataStreamResponse();
-}
-```
 
 ### Custom Tools
 
@@ -177,5 +127,36 @@ const webSearch = tool({
   },
 });
 ```
+
+
+**Note:** This package includes both AI SDK v4 and v5 support via package aliases.
+
+## Version Compatibility
+
+**This package supports both AI SDK v4 and v5.** 
+
+Using npm package aliases, we bundle both `ai@4.x` and `ai@5.x` within the same package, providing compatibility for both versions.
+
+### Choose Your Version
+
+- **AI SDK v5 (Default/Recommended)**
+  ```typescript
+  import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools';
+  // or explicitly
+  import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools/v5';
+  ```
+
+- **AI SDK v4**
+  ```typescript
+  import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools/v4';
+  ```
+
+### How It Works
+
+The package uses npm package aliases to install both versions:
+- `ai-v4`: Maps to `ai@^4.0.0` (uses `parameters` API)
+- `ai-v5`: Maps to `ai@^5.0.0` (uses `inputSchema` API)
+
+Each version has its own implementation that imports from the appropriate aliased package, ensuring compatibility with both SDK versions.
 
 
