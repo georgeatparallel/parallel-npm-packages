@@ -20,7 +20,12 @@ Add `PARALLEL_API_KEY` obtained from [Parallel Platform](https://platform.parall
 
 `searchTool` uses [Parallel's web search API](https://docs.parallel.ai/api-reference/search-api/search) to get fresh relevant search results.
 
-### With AI SDK v5 (Recommended)
+### Extract Tool
+
+`extractTool` uses [Parallel's extract API](https://docs.parallel.ai/api-reference/search-and-extract-api-beta/extract) to extract a web-page's content, for a given objective.
+
+
+### With AI SDK v5 (Default exports)
 
 ```typescript
 import { openai } from '@ai-sdk/openai';
