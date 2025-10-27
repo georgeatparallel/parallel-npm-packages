@@ -1,8 +1,8 @@
 /**
- * Extract tool for Parallel Web (AI SDK v5)
+ * Extract tool for Parallel Web
  */
 
-import { tool } from 'ai-v5';
+import { tool } from 'ai';
 import { z } from 'zod';
 import { parallelClient } from '../client.js';
 
