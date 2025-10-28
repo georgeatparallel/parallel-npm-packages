@@ -1,8 +1,8 @@
 /**
- * Search tool for Parallel Web (AI SDK v5)
+ * Search tool for Parallel Web
  */
 
-import { tool } from 'ai-v5';
+import { tool } from 'ai';
 import { z } from 'zod';
 import { BetaSearchParams } from 'parallel-web/resources/beta/beta.mjs';
 import { parallelClient } from '../client.js';
@@ -33,6 +33,7 @@ const search = async (
     },
     {
       signal: abortSignal,
+      headers: { 'parallel-beta': 'search-extract-2025-10-10' },
     }
   );
 };

@@ -1,13 +1,10 @@
 /**
  * @parallel-web/ai-sdk-tools
  *
- * AI SDK tools for Parallel Web
+ * AI SDK tools for Parallel Web (AI SDK v5)
  *
- * This package supports both AI SDK v4 and v5:
- * - Default export (v5): import from '@parallel-web/ai-sdk-tools'
- * - AI SDK v5: import from '@parallel-web/ai-sdk-tools/v5'
- * - AI SDK v4: import from '@parallel-web/ai-sdk-tools/v4'
+ * For AI SDK v4 compatibility, see the README for implementation examples.
  */
 
-export { searchTool } from './v5/tools/search.js';
-export { extractTool } from './v5/tools/extract.js';
+export { searchTool } from './tools/search.js';
+export { extractTool } from './tools/extract.js';
