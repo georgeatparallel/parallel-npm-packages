@@ -33,6 +33,7 @@ const search = async (
     },
     {
       signal: abortSignal,
+      headers: { 'parallel-beta': 'search-extract-2025-10-10' },
     }
   );
 };
