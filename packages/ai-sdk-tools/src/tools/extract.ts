@@ -36,7 +36,10 @@ HTTP/HTTPS URLs. Maximum 10 URLs per request.`
   execute: async function ({ ...args }, { abortSignal }) {
     const results = await parallelClient.beta.extract(
       { ...args },
-      { signal: abortSignal, headers: { 'parallel-beta': 'parallel' } }
+      {
+        signal: abortSignal,
+        headers: { 'parallel-beta': 'search-extract-2025-10-10' },
+      }
     );
 
     return {
