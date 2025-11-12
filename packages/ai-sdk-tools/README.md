@@ -26,7 +26,6 @@ Add `PARALLEL_API_KEY` obtained from [Parallel Platform](https://platform.parall
 
 `extractTool` uses [Parallel's extract API](https://docs.parallel.ai/api-reference/search-and-extract-api-beta/extract) to extract a web-page's content, for a given objective.
 
-
 ### Basic Example
 
 ```typescript
@@ -37,7 +36,7 @@ import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools';
 const result = streamText({
   model: openai('gpt-4o'),
   messages: [
-    { role: 'user', content: 'What are the latest developments in AI?' }
+    { role: 'user', content: 'What are the latest developments in AI?' },
   ],
   tools: {
     'web-search': searchTool,
@@ -53,6 +52,7 @@ return result.toDataStreamResponse();
 ### Custom Tools
 
 You can create custom tools that wrap the Parallel Web API:
+
 ```typescript
 import { tool, generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
@@ -66,7 +66,7 @@ const parallel = new Parallel({
 const webSearch = tool({
   description: 'Use this tool to search the web.',
   inputSchema: z.object({
-    searchQueries: z.array(z.string()).describe("Search queries"),
+    searchQueries: z.array(z.string()).describe('Search queries'),
     usersQuestion: z.string().describe("The user's question"),
   }),
   execute: async ({ searchQueries, usersQuestion }) => {
@@ -180,13 +180,18 @@ const extractTool = tool({
 Ideal Use Cases:
 - Extracting content from specific URLs you've already identified
 - Exploring URLs returned by a web search in greater depth`,
-  parameters: z.object({  // v4 uses parameters instead of inputSchema
-    objective: z.string().describe(
-      'Natural-language description of what information you\'re looking for from the URLs.'
-    ),
-    urls: z.array(z.string()).describe(
-      'List of URLs to extract content from. Maximum 10 URLs per request.'
-    ),
+  parameters: z.object({
+    // v4 uses parameters instead of inputSchema
+    objective: z
+      .string()
+      .describe(
+        "Natural-language description of what information you're looking for from the URLs."
+      ),
+    urls: z
+      .array(z.string())
+      .describe(
+        'List of URLs to extract content from. Maximum 10 URLs per request.'
+      ),
     search_queries: z
       .array(z.string())
       .optional()
@@ -205,5 +210,3 @@ Ideal Use Cases:
   },
 });
 ```
-
-
