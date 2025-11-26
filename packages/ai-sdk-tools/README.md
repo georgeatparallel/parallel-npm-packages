@@ -46,7 +46,7 @@ const result = streamText({
 });
 
 // Stream the response
-return result.toDataStreamResponse();
+return result.toUIMessageStreamResponse();
 ```
 
 ### Custom Tools
