@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractTool } from '../index.js';
+import { extractTool, createExtractTool } from '../index.js';
 
 describe.skipIf(!process.env.PARALLEL_API_KEY)(
   'extractTool integration tests',
@@ -13,21 +13,16 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
         async () => {
           const result = await extractTool.execute(
             {
-              objective: 'Extract information about TypeScript',
               urls: ['https://www.typescriptlang.org/'],
+              objective: 'Extract information about TypeScript',
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.objective).toBe(
-            'Extract information about TypeScript'
-          );
-          expect(result.searchParams.urls).toEqual([
-            'https://www.typescriptlang.org/',
-          ]);
-          expect(result.answer).toBeDefined();
+          expect(result.extract_id).toBeDefined();
+          expect(result.results).toBeDefined();
+          expect(Array.isArray(result.results)).toBe(true);
         },
         timeout
       );
@@ -37,112 +32,35 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
         async () => {
           const result = await extractTool.execute(
             {
-              objective: 'Extract JavaScript documentation',
               urls: [
                 'https://developer.mozilla.org/en-US/docs/Web/JavaScript',
                 'https://javascript.info/',
               ],
+              objective: 'Extract JavaScript documentation',
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.urls).toHaveLength(2);
-          expect(result.answer).toBeDefined();
+          expect(result.extract_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );
 
       it(
-        'should extract content from Wikipedia URL',
+        'should extract content without objective',
         async () => {
           const result = await extractTool.execute(
             {
-              objective: 'Extract information about Python programming',
-              urls: [
-                'https://en.wikipedia.org/wiki/Python_(programming_language)',
-              ],
+              urls: ['https://example.com'],
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.objective).toBe(
-            'Extract information about Python programming'
-          );
-          expect(result.answer).toBeDefined();
-        },
-        timeout
-      );
-    });
-
-    describe('extract with optional parameters', () => {
-      it(
-        'should extract content with search_queries parameter',
-        async () => {
-          const result = await extractTool.execute(
-            {
-              objective: 'Find React hooks information',
-              urls: ['https://react.dev/'],
-              search_queries: ['React hooks', 'useState', 'useEffect'],
-            },
-            { abortSignal: undefined }
-          );
-
-          expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.search_queries).toEqual([
-            'React hooks',
-            'useState',
-            'useEffect',
-          ]);
-          expect(result.answer).toBeDefined();
-        },
-        timeout
-      );
-
-      it(
-        'should extract content without search_queries',
-        async () => {
-          const result = await extractTool.execute(
-            {
-              objective: 'Get Node.js documentation',
-              urls: ['https://nodejs.org/en/docs/'],
-            },
-            { abortSignal: undefined }
-          );
-
-          expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.objective).toBe(
-            'Get Node.js documentation'
-          );
-          expect(result.searchParams.search_queries).toBeUndefined();
-          expect(result.answer).toBeDefined();
-        },
-        timeout
-      );
-
-      it(
-        'should extract content from GitHub repository URL',
-        async () => {
-          const result = await extractTool.execute(
-            {
-              objective: 'Extract README information',
-              urls: ['https://github.com/vercel/ai'],
-              search_queries: ['AI SDK', 'installation'],
-            },
-            { abortSignal: undefined }
-          );
-
-          expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.urls).toEqual([
-            'https://github.com/vercel/ai',
-          ]);
-          expect(result.answer).toBeDefined();
+          expect(result.extract_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );
@@ -150,38 +68,64 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
 
     describe('response structure validation', () => {
       it(
-        'should return result with correct structure',
+        'should return raw API response structure',
         async () => {
           const result = await extractTool.execute(
             {
-              objective: 'Test extraction',
               urls: ['https://example.com'],
+              objective: 'Test extraction',
             },
             { abortSignal: undefined }
           );
 
-          expect(result).toHaveProperty('searchParams');
-          expect(result).toHaveProperty('answer');
-          expect(typeof result.searchParams).toBe('object');
-          expect(typeof result.answer).toBe('object');
+          // Should return raw API response, not wrapped
+          expect(result).toHaveProperty('extract_id');
+          expect(result).toHaveProperty('results');
+          expect(result).toHaveProperty('errors');
+          expect(result).not.toHaveProperty('searchParams');
+          expect(result).not.toHaveProperty('answer');
         },
         timeout
       );
 
       it(
-        'should preserve all input parameters in searchParams',
+        'should have results array with expected properties',
         async () => {
-          const inputParams = {
-            objective: 'Extract specific content',
-            urls: ['https://www.npmjs.com/package/ai'],
-            search_queries: ['AI SDK', 'features'],
-          };
+          const result = await extractTool.execute(
+            {
+              urls: ['https://www.typescriptlang.org/'],
+              objective: 'TypeScript information',
+            },
+            { abortSignal: undefined }
+          );
 
-          const result = await extractTool.execute(inputParams, {
-            abortSignal: undefined,
+          expect(result.results.length).toBeGreaterThan(0);
+          const firstResult = result.results[0];
+          expect(firstResult).toHaveProperty('url');
+        },
+        timeout
+      );
+    });
+
+    describe('createExtractTool factory', () => {
+      it(
+        'should create tool with custom defaults',
+        async () => {
+          const customExtractTool = createExtractTool({
+            full_content: true,
           });
 
-          expect(result.searchParams).toEqual(inputParams);
+          const result = await customExtractTool.execute(
+            {
+              urls: ['https://example.com'],
+              objective: 'Extract full content',
+            },
+            { abortSignal: undefined }
+          );
+
+          expect(result).toBeDefined();
+          expect(result.extract_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );

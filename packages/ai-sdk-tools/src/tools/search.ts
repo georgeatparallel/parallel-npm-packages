@@ -4,107 +4,152 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { BetaSearchParams } from 'parallel-web/resources/beta/beta.mjs';
+import type {
+  ExcerptSettings,
+  FetchPolicy,
+} from 'parallel-web/resources/beta/beta.mjs';
+import type { SourcePolicy } from 'parallel-web/resources/shared.mjs';
 import { parallelClient } from '../client.js';
 
-function getSearchParams(
-  search_type: 'list' | 'targeted' | 'general' | 'single_page'
-): Pick<BetaSearchParams, 'max_results' | 'max_chars_per_result'> {
-  switch (search_type) {
-    case 'targeted':
-      return { max_results: 5, max_chars_per_result: 16000 };
-    case 'general':
-      return { max_results: 10, max_chars_per_result: 9000 };
-    case 'single_page':
-      return { max_results: 2, max_chars_per_result: 30000 };
-    case 'list':
-    default:
-      return { max_results: 20, max_chars_per_result: 1500 };
-  }
+/**
+ * Options for creating a custom search tool with code-supplied defaults.
+ */
+export interface CreateSearchToolOptions {
+  /**
+   * Default mode for search. 'agentic' returns concise, token-efficient results
+   * for multi-step workflows. 'one-shot' returns comprehensive results with
+   * longer excerpts. Defaults to 'agentic'.
+   */
+  mode?: 'agentic' | 'one-shot';
+
+  /**
+   * Maximum number of search results to return. Defaults to 10.
+   */
+  max_results?: number;
+
+  /**
+   * Excerpt settings for controlling excerpt length.
+   */
+  excerpts?: ExcerptSettings;
+
+  /**
+   * Source policy for controlling which domains to include/exclude and freshness.
+   */
+  source_policy?: SourcePolicy | null;
+
+  /**
+   * Fetch policy for controlling cached vs fresh content.
+   */
+  fetch_policy?: FetchPolicy | null;
+
+  /**
+   * Custom tool description. If not provided, uses the default description.
+   */
+  description?: string;
 }
 
-const search = async (
-  searchArgs: BetaSearchParams,
-  { abortSignal }: { abortSignal: AbortSignal | undefined }
-) => {
-  return await parallelClient.beta.search(
-    {
-      ...searchArgs,
-    },
-    {
-      signal: abortSignal,
-      headers: { 'parallel-beta': 'search-extract-2025-10-10' },
-    }
-  );
-};
+const objectiveDescription = `Natural-language description of what the web search is trying to find.
+Try to make the search objective atomic, looking for a specific piece of information. May include guidance about preferred sources or freshness.`;
 
+const searchQueriesDescription = `(optional) List of keyword search queries of 1-6 words, which may include search operators. The search queries should be related to the objective. Limited to 5 entries of 200 characters each.`;
+
+const modeDescription = `Presets default values for different use cases. "one-shot" returns more comprehensive results and longer excerpts to answer questions from a single response, while "agentic" returns more concise, token-efficient results for use in an agentic loop. Defaults to "agentic".`;
+
+/**
+ * Search tool that mirrors the MCP web_search_preview tool.
+ * Takes objective and optional search_queries/mode, returns raw search response.
+ */
 export const searchTool = tool({
-  description: `Use the web_search_parallel tool to access information from the web. The
-web_search_parallel tool returns ranked, extended web excerpts optimized for LLMs.
-Intelligently scale the number of web_search_parallel tool calls to get more information
-when needed, from a single call for simple factual questions to five or more calls for
-complex research questions.
+  description: `Purpose: Perform web searches and return results in an LLM-friendly format.
 
-* Keep queries concise - 1-6 words for best results. Start broad with very short
-  queries and medium context, then add words to narrow results or use high context
-  if needed.
-* Include broader context about what the search is trying to accomplish in the
-  \`objective\` field. This helps the search engine understand the user's intent and
-  provide relevant results and excerpts.
-* Never repeat similar search queries - make every query unique. If initial results are
-  insufficient, reformulate queries to obtain new and better results.
-
-How to use:
-- For simple queries, a one-shot call to depth is usually sufficient.
-- For complex multi-hop queries, first try to use breadth to narrow down sources. Then
-use other search types with include_domains to get more detailed results.`,
+Use the web search tool to search the web and access information from the web. The tool returns ranked, extended web excerpts optimized for LLMs.`,
   inputSchema: z.object({
-    objective: z.string().describe(
-      `Natural-language description of what the web research goal
- is. Specify the broad intent of the search query here. Also include any source or
- freshness guidance here. Limit to 200 characters. This should reflect the end goal so
- that the tool can better understand the intent and return the best results. Do not
- dump long texts.`
-    ),
-    search_type: z
-      .enum(['list', 'general', 'single_page', 'targeted'])
-      .describe(
-        `Can be "list", "general", "single_page" or "targeted".
- "list" should be used for searching for data broadly, like aggregating data or
- considering multiple sources or doing broad initial research. "targeted" should be
- used for searching for data from a specific source set. "general" is a catch all case
- if there is no specific use case from list or targeted. "single_page" extracts data
- from a single page - extremely targeted. If there is a specific webpage you want the
- data from, use "single_page" and mention the URL in the objective.
- Use search_type appropriately.`
-      )
-      .optional()
-      .default('list'),
+    objective: z.string().describe(objectiveDescription),
     search_queries: z
       .array(z.string())
       .optional()
-      .describe(
-        `(optional) List of keyword search queries of 1-6
- words, which may include search operators. The search queries should be related to the
- objective. Limited to 5 entries of 200 characters each. Usually 1-3 queries are
- ideal.`
-      ),
-    include_domains: z.array(z.string()).optional()
-      .describe(`(optional) List of valid URL domains to explicitly
- focus on for the search. This will restrict all search results to only include results
- from the provided list. This is useful when you want to only use a specific set of
- sources. example: ["google.com", "wikipedia.org"]. Maximum 10 entries.`),
+      .describe(searchQueriesDescription),
+    mode: z
+      .enum(['agentic', 'one-shot'])
+      .optional()
+      .default('agentic')
+      .describe(modeDescription),
   }),
 
-  execute: async function ({ ...args }, { abortSignal }) {
-    const results = await search(
-      { ...args, ...getSearchParams(args.search_type) },
-      { abortSignal }
+  execute: async function (
+    { objective, search_queries, mode },
+    { abortSignal }
+  ) {
+    return await parallelClient.beta.search(
+      {
+        objective,
+        search_queries,
+        mode,
+      },
+      {
+        signal: abortSignal,
+        headers: { 'parallel-beta': 'search-extract-2025-10-10' },
+      }
     );
-
-    return {
-      searchParams: args,
-      answer: results,
-    };
   },
 });
+
+const defaultSearchDescription = `Purpose: Perform web searches and return results in an LLM-friendly format.
+
+Use the web search tool to search the web and access information from the web. The tool returns ranked, extended web excerpts optimized for LLMs.`;
+
+/**
+ * Factory function to create a search tool with custom defaults.
+ *
+ * Use this when you want to set defaults for mode, max_results, excerpts,
+ * source_policy, or fetch_policy in your code, so the LLM only needs to
+ * provide objective and search_queries.
+ *
+ * @example
+ * ```ts
+ * const mySearchTool = createSearchTool({
+ *   mode: 'one-shot',
+ *   max_results: 5,
+ *   excerpts: { max_chars_per_result: 5000 },
+ * });
+ * ```
+ */
+export function createSearchTool(options: CreateSearchToolOptions = {}) {
+  const {
+    mode: defaultMode = 'agentic',
+    max_results,
+    excerpts,
+    source_policy,
+    fetch_policy,
+    description = defaultSearchDescription,
+  } = options;
+
+  return tool({
+    description,
+    inputSchema: z.object({
+      objective: z.string().describe(objectiveDescription),
+      search_queries: z
+        .array(z.string())
+        .optional()
+        .describe(searchQueriesDescription),
+    }),
+
+    execute: async function ({ objective, search_queries }, { abortSignal }) {
+      return await parallelClient.beta.search(
+        {
+          objective,
+          search_queries,
+          mode: defaultMode,
+          max_results,
+          excerpts,
+          source_policy,
+          fetch_policy,
+        },
+        {
+          signal: abortSignal,
+          headers: { 'parallel-beta': 'search-extract-2025-10-10' },
+        }
+      );
+    },
+  });
+}

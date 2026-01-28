@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { searchTool } from '../index.js';
+import { searchTool, createSearchTool } from '../index.js';
 
 describe.skipIf(!process.env.PARALLEL_API_KEY)(
   'searchTool integration tests',
@@ -9,84 +9,58 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
 
     describe('basic search execution', () => {
       it(
-        'should execute search with list search_type',
+        'should execute search with default agentic mode',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'Find information about TypeScript',
-              search_type: 'list',
               search_queries: ['TypeScript programming'],
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.objective).toBe(
-            'Find information about TypeScript'
-          );
-          expect(result.searchParams.search_type).toBe('list');
-          expect(result.answer).toBeDefined();
+          expect(result.search_id).toBeDefined();
+          expect(result.results).toBeDefined();
+          expect(Array.isArray(result.results)).toBe(true);
         },
         timeout
       );
 
       it(
-        'should execute search with general search_type',
+        'should execute search with one-shot mode',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'Information about Node.js',
-              search_type: 'general',
               search_queries: ['Node.js'],
+              mode: 'one-shot',
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.search_type).toBe('general');
-          expect(result.answer).toBeDefined();
+          expect(result.search_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );
 
       it(
-        'should execute search with targeted search_type',
+        'should execute search with agentic mode explicitly',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'React documentation',
-              search_type: 'targeted',
               search_queries: ['React hooks'],
+              mode: 'agentic',
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.search_type).toBe('targeted');
-          expect(result.answer).toBeDefined();
-        },
-        timeout
-      );
-
-      it(
-        'should execute search with single_page search_type',
-        async () => {
-          const result = await searchTool.execute(
-            {
-              objective: 'Get content from Wikipedia Python page',
-              search_type: 'single_page',
-              search_queries: ['Python programming Wikipedia'],
-            },
-            { abortSignal: undefined }
-          );
-
-          expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.search_type).toBe('single_page');
-          expect(result.answer).toBeDefined();
+          expect(result.search_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );
@@ -94,31 +68,24 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
 
     describe('search with optional parameters', () => {
       it(
-        'should execute search with include_domains parameter',
+        'should execute search with objective only',
         async () => {
           const result = await searchTool.execute(
             {
-              objective: 'Find JavaScript tutorials',
-              search_type: 'list',
-              search_queries: ['JavaScript tutorial'],
-              include_domains: ['developer.mozilla.org', 'javascript.info'],
+              objective: 'Current weather trends',
             },
             { abortSignal: undefined }
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.include_domains).toEqual([
-            'developer.mozilla.org',
-            'javascript.info',
-          ]);
-          expect(result.answer).toBeDefined();
+          expect(result.search_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );
 
       it(
-        'should execute search with only objective and search_queries',
+        'should execute search with objective and search_queries',
         async () => {
           const result = await searchTool.execute(
             {
@@ -129,32 +96,8 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
           );
 
           expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.objective).toBe('AI SDK information');
-          expect(result.searchParams.search_queries).toEqual([
-            'AI SDK',
-            'Vercel AI',
-          ]);
-          expect(result.answer).toBeDefined();
-        },
-        timeout
-      );
-
-      it(
-        'should execute search without search_queries',
-        async () => {
-          const result = await searchTool.execute(
-            {
-              objective: 'Current weather trends',
-              search_type: 'general',
-            },
-            { abortSignal: undefined }
-          );
-
-          expect(result).toBeDefined();
-          expect(result.searchParams).toBeDefined();
-          expect(result.searchParams.objective).toBe('Current weather trends');
-          expect(result.answer).toBeDefined();
+          expect(result.search_id).toBeDefined();
+          expect(result.results).toBeDefined();
         },
         timeout
       );
@@ -162,21 +105,67 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
 
     describe('response structure validation', () => {
       it(
-        'should return result with correct structure',
+        'should return raw API response structure',
         async () => {
           const result = await searchTool.execute(
             {
               objective: 'Test query',
-              search_type: 'list',
               search_queries: ['test'],
             },
             { abortSignal: undefined }
           );
 
-          expect(result).toHaveProperty('searchParams');
-          expect(result).toHaveProperty('answer');
-          expect(typeof result.searchParams).toBe('object');
-          expect(typeof result.answer).toBe('object');
+          // Should return raw API response, not wrapped
+          expect(result).toHaveProperty('search_id');
+          expect(result).toHaveProperty('results');
+          expect(result).not.toHaveProperty('searchParams');
+          expect(result).not.toHaveProperty('answer');
+        },
+        timeout
+      );
+
+      it(
+        'should have results array with expected properties',
+        async () => {
+          const result = await searchTool.execute(
+            {
+              objective: 'TypeScript programming language',
+              search_queries: ['TypeScript'],
+            },
+            { abortSignal: undefined }
+          );
+
+          expect(result.results.length).toBeGreaterThan(0);
+          const firstResult = result.results[0];
+          expect(firstResult).toHaveProperty('url');
+          expect(firstResult).toHaveProperty('excerpts');
+        },
+        timeout
+      );
+    });
+
+    describe('createSearchTool factory', () => {
+      it(
+        'should create tool with custom defaults',
+        async () => {
+          const customSearchTool = createSearchTool({
+            mode: 'one-shot',
+            max_results: 3,
+          });
+
+          const result = await customSearchTool.execute(
+            {
+              objective: 'JavaScript frameworks',
+              search_queries: ['JavaScript framework'],
+            },
+            { abortSignal: undefined }
+          );
+
+          expect(result).toBeDefined();
+          expect(result.search_id).toBeDefined();
+          expect(result.results).toBeDefined();
+          // max_results may limit results
+          expect(result.results.length).toBeLessThanOrEqual(3);
         },
         timeout
       );
