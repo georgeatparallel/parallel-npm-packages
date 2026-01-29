@@ -88,7 +88,6 @@ Use the web search tool to search the web and access information from the web. T
       },
       {
         signal: abortSignal,
-        headers: { 'parallel-beta': 'search-extract-2025-10-10' },
       }
     );
   },
@@ -147,7 +146,6 @@ export function createSearchTool(options: CreateSearchToolOptions = {}) {
         },
         {
           signal: abortSignal,
-          headers: { 'parallel-beta': 'search-extract-2025-10-10' },
         }
       );
     },

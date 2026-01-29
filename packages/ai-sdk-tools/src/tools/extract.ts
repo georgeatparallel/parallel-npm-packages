@@ -62,7 +62,7 @@ Ideal Use Cases:
       {
         urls,
         objective,
-        betas: ['search-extract-2025-10-10'],
+        betas: [],
       },
       {
         signal: abortSignal,
@@ -114,7 +114,7 @@ export function createExtractTool(options: CreateExtractToolOptions = {}) {
           excerpts,
           full_content,
           fetch_policy,
-          betas: ['search-extract-2025-10-10'],
+          betas: [],
         },
         {
           signal: abortSignal,
