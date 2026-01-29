@@ -9,7 +9,7 @@ import { Parallel } from 'parallel-web';
 let _parallelClient: Parallel | null = null;
 
 export const parallelClient = new Proxy({} as Parallel, {
-  get(_target, prop) {
+  get(_target, prop: keyof Parallel) {
     if (!_parallelClient) {
       _parallelClient = new Parallel({
         apiKey: process.env['PARALLEL_API_KEY'],
@@ -18,6 +18,6 @@ export const parallelClient = new Proxy({} as Parallel, {
         },
       });
     }
-    return (_parallelClient as any)[prop];
+    return _parallelClient[prop];
   },
 });
