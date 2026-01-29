@@ -57,12 +57,14 @@ Ideal Use Cases:
     objective: z.string().optional().describe(objectiveDescription),
   }),
 
-  execute: async function ({ urls, objective }, { abortSignal }) {
+  execute: async function (
+    { urls, objective }: { urls: string[]; objective?: string },
+    { abortSignal }: { abortSignal?: AbortSignal }
+  ) {
     return await parallelClient.beta.extract(
       {
         urls,
         objective,
-        betas: [],
       },
       {
         signal: abortSignal,
@@ -106,7 +108,10 @@ export function createExtractTool(options: CreateExtractToolOptions = {}) {
       objective: z.string().optional().describe(objectiveDescription),
     }),
 
-    execute: async function ({ urls, objective }, { abortSignal }) {
+    execute: async function (
+      { urls, objective }: { urls: string[]; objective?: string },
+      { abortSignal }: { abortSignal?: AbortSignal }
+    ) {
       return await parallelClient.beta.extract(
         {
           urls,
@@ -114,7 +119,6 @@ export function createExtractTool(options: CreateExtractToolOptions = {}) {
           excerpts,
           full_content,
           fetch_policy,
-          betas: [],
         },
         {
           signal: abortSignal,
