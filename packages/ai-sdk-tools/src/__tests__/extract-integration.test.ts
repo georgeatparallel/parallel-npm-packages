@@ -5,9 +5,9 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
   'extractTool integration tests',
   () => {
     // Increase timeout for API calls
-    const timeout = 30000;
+    const timeout = 60000;
 
-    describe('basic extract execution', () => {
+    describe.concurrent('basic extract execution', () => {
       it(
         'should extract content from a single URL',
         async () => {
@@ -66,7 +66,7 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
       );
     });
 
-    describe('response structure validation', () => {
+    describe.concurrent('response structure validation', () => {
       it(
         'should return raw API response structure',
         async () => {
@@ -107,7 +107,7 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
       );
     });
 
-    describe('createExtractTool factory', () => {
+    describe.concurrent('createExtractTool factory', () => {
       it(
         'should create tool with custom defaults',
         async () => {
