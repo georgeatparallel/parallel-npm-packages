@@ -1,8 +1,15 @@
 import { defineConfig } from 'vitest/config';
 import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const pkg = JSON.parse(
-  readFileSync('./packages/ai-sdk-tools/package.json', 'utf-8')
+  readFileSync(
+    resolve(__dirname, 'packages/ai-sdk-tools/package.json'),
+    'utf-8'
+  )
 );
 
 export default defineConfig({
