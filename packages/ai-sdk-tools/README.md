@@ -12,7 +12,7 @@ pnpm add ai @parallel-web/ai-sdk-tools
 yarn add ai @parallel-web/ai-sdk-tools
 ```
 
-> **Note:** This package requires AI SDK v5. If you're using AI SDK v4, see the [AI SDK v4 Implementation](#ai-sdk-v4-implementation) section below.
+> **Note:** This package requires AI SDK v5. For AI SDK v4, use `parameters` instead of `inputSchema` when defining tools manually with the `parallel-web` SDK.
 
 ## Usage
 
@@ -20,17 +20,26 @@ Add `PARALLEL_API_KEY` obtained from [Parallel Platform](https://platform.parall
 
 ### Search Tool
 
-`searchTool` uses [Parallel's web search API](https://docs.parallel.ai/api-reference/search-api/search) to get fresh relevant search results.
+`searchTool` uses [Parallel's Search API](https://docs.parallel.ai/api-reference/search-beta/search) to perform web searches and return LLM-optimized results.
+
+**Input schema:**
+- `objective` (required): Natural-language description of what the web search is trying to find
+- `search_queries` (optional): List of keyword search queries (1-6 words each)
+- `mode` (optional): `'agentic'` (default) for concise results in agentic loops, or `'one-shot'` for comprehensive single-response results
 
 ### Extract Tool
 
-`extractTool` uses [Parallel's extract API](https://docs.parallel.ai/api-reference/search-and-extract-api-beta/extract) to extract a web-page's content, for a given objective.
+`extractTool` uses [Parallel's Extract API](https://docs.parallel.ai/api-reference/extract-beta/extract) to fetch and extract relevant content from specific URLs.
+
+**Input schema:**
+- `urls` (required): List of URLs to extract content from (max 10)
+- `objective` (optional): Natural-language description of what information you're looking for
 
 ### Basic Example
 
 ```typescript
 import { openai } from '@ai-sdk/openai';
-import { streamText, type Tool } from 'ai';
+import { streamText } from 'ai';
 import { searchTool, extractTool } from '@parallel-web/ai-sdk-tools';
 
 const result = streamText({
@@ -49,13 +58,44 @@ const result = streamText({
 return result.toUIMessageStreamResponse();
 ```
 
-### Custom Tools
+## Factory Functions
 
-You can create custom tools that wrap the Parallel Web API:
+For more control over the tool configuration, use the factory functions to create tools with custom defaults:
+
+### createSearchTool
+
+Create a search tool with custom defaults for mode, max_results, excerpts, source_policy, or fetch_policy.
 
 ```typescript
-import { tool, generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { createSearchTool } from '@parallel-web/ai-sdk-tools';
+
+const myCustomSearchTool = createSearchTool({
+  mode: 'one-shot',            // 'one-shot' returns more comprehensive results and longer excerpts to answer questions from a single response.
+  max_results: 5,              // Limit to 5 results
+});
+```
+
+### createExtractTool
+
+Create an extract tool with custom defaults for excerpts, full_content, or fetch_policy.
+
+```typescript
+import { createExtractTool } from '@parallel-web/ai-sdk-tools';
+
+const myExtractTool = createExtractTool({
+  full_content: true,          // Include full page content
+  excerpts: {
+    max_chars_per_result: 10000,
+  },
+});
+```
+
+## Direct API Usage
+
+You can also use the `parallel-web` SDK directly for maximum flexibility:
+
+```typescript
+import { tool } from 'ai';
 import { z } from 'zod';
 import { Parallel } from 'parallel-web';
 
@@ -64,149 +104,120 @@ const parallel = new Parallel({
 });
 
 const webSearch = tool({
-  description: 'Use this tool to search the web.',
+  description: 'Search the web for information.',
   inputSchema: z.object({
-    searchQueries: z.array(z.string()).describe('Search queries'),
-    usersQuestion: z.string().describe("The user's question"),
+    query: z.string().describe("The user's question"),
   }),
-  execute: async ({ searchQueries, usersQuestion }) => {
-    const search = await parallel.beta.search({
-      objective: usersQuestion,
-      search_queries: searchQueries,
-      max_results: 3,
-      max_chars_per_result: 1000,
+  execute: async ({ query }) => {
+    const result = await parallel.beta.search({
+      objective: query,
+      mode: 'agentic',
+      max_results: 5,
     });
-    return search.results;
+    return result;
   },
 });
 ```
 
-## AI SDK v4 Implementation
+## API Reference
 
-If you're using AI SDK v4, you can implement the tools manually using the Parallel Web API. The key difference is that v4 uses `parameters` instead of `inputSchema`.
+- [Search API Documentation](https://docs.parallel.ai/search/search-quickstart)
+- [Extract API Documentation](https://docs.parallel.ai/extract/extract-quickstart)
+- [Search API Best Practices](https://docs.parallel.ai/search/best-practices)
 
-### Search Tool (v4)
+## Response Format
+
+Both tools return the raw API response from Parallel:
+
+### Search Response
 
 ```typescript
-import { tool } from 'ai';
-import { z } from 'zod';
-import { Parallel } from 'parallel-web';
-
-const parallel = new Parallel({
-  apiKey: process.env.PARALLEL_API_KEY,
-});
-
-function getSearchParams(
-  search_type: 'list' | 'targeted' | 'general' | 'single_page'
-): Pick<BetaSearchParams, 'max_results' | 'max_chars_per_result'> {
-  switch (search_type) {
-    case 'targeted':
-      return {
-        max_results: 5,
-        max_chars_per_result: 16000
-      };
-    case 'general':
-      return {
-        max_results: 10,
-        max_chars_per_result: 9000
-      };
-    case 'single_page':
-      return {
-        max_results: 2,
-        max_chars_per_result: 30000
-      };
-    case 'list':
-    default:
-      return {
-        max_results: 20,
-        max_chars_per_result: 1500
-      };
-  }
+{
+  search_id: string;
+  results: Array<{
+    url: string;
+    title?: string;
+    publish_date?: string;
+    excerpts: string[];
+  }>;
+  usage?: Array<{ name: string; count: number }>;
+  warnings?: Array<{ code: string; message: string }>;
 }
-
-const searchTool = tool({
-  description: `Use the web_search_parallel tool to access information from the web. The
-web_search_parallel tool returns ranked, extended web excerpts optimized for LLMs.
-Intelligently scale the number of web_search_parallel tool calls to get more information
-when needed, from a single call for simple factual questions to five or more calls for
-complex research questions.`,
-  parameters: z.object({  // v4 uses parameters instead of inputSchema
-    objective: z.string().describe(
-      'Natural-language description of what the web research goal is.'
-    ),
-    search_type: z
-      .enum(['list', 'general', 'single_page', 'targeted'])
-      .optional()
-      .default('list'),
-    search_queries: z
-      .array(z.string())
-      .optional()
-      .describe('List of keyword search queries of 1-6 words.'),
-    include_domains: z
-      .array(z.string())
-      .optional()
-      .describe('List of valid URL domains to restrict search results.'),
-  }),
-  execute: async (
-    { ...args },
-    { abortSignal }: { abortSignal?: AbortSignal }
-  ) => {
-    const results = const results = await search(
-      { ...args, ...getSearchParams(args.search_type) },
-      { abortSignal }
-    );
-    return {
-      searchParams: { objective, search_type, search_queries, include_domains },
-      answer: results,
-    };
-  },
-});
 ```
 
-### Extract Tool (v4)
+### Extract Response
 
 ```typescript
-import { tool } from 'ai';
-import { z } from 'zod';
-import { Parallel } from 'parallel-web';
+{
+  extract_id: string;
+  results: Array<{
+    url: string;
+    title?: string;
+    excerpts?: string[];
+    full_content?: string;
+    publish_date?: string;
+  }>;
+  errors: Array<{
+    url: string;
+    error_type: string;
+    http_status_code?: number;
+    content?: string;
+  }>;
+  usage?: Array<{ name: string; count: number }>;
+  warnings?: Array<{ code: string; message: string }>;
+}
+```
 
-const parallel = new Parallel({
-  apiKey: process.env.PARALLEL_API_KEY,
+## Migration from v0.1.x
+
+Version 0.2.0 introduces an updated API that conforms with Parallel's Search and Extract MCP tools:
+
+### searchTool changes
+
+- **Input schema changed**: Removed `search_type` and `include_domains`. Added `mode` parameter.
+- **Return value changed**: Now returns raw API response (`{ search_id, results, ... }`) instead of `{ searchParams, answer }`.
+
+**Before (v0.1.x):**
+```typescript
+const result = await searchTool.execute({
+  objective: 'Find TypeScript info',
+  search_type: 'list',
+  search_queries: ['TypeScript'],
+  include_domains: ['typescriptlang.org'],
 });
+console.log(result.answer.results);
+```
 
-const extractTool = tool({
-  description: `Purpose: Fetch and extract relevant content from specific web URLs.
-
-Ideal Use Cases:
-- Extracting content from specific URLs you've already identified
-- Exploring URLs returned by a web search in greater depth`,
-  parameters: z.object({
-    // v4 uses parameters instead of inputSchema
-    objective: z
-      .string()
-      .describe(
-        "Natural-language description of what information you're looking for from the URLs."
-      ),
-    urls: z
-      .array(z.string())
-      .describe(
-        'List of URLs to extract content from. Maximum 10 URLs per request.'
-      ),
-    search_queries: z
-      .array(z.string())
-      .optional()
-      .describe('Optional keyword search queries related to the objective.'),
-  }),
-  execute: async ({ objective, urls, search_queries }) => {
-    const results = await parallel.beta.extract({
-      objective,
-      urls,
-      search_queries,
-    });
-    return {
-      searchParams: { objective, urls, search_queries },
-      answer: results,
-    };
-  },
+**After (v0.2.0):**
+```typescript
+const result = await searchTool.execute({
+  objective: 'Find TypeScript info',
+  search_queries: ['TypeScript'],
+  mode: 'agentic', // optional, defaults to 'agentic'
 });
+console.log(result.results);
+```
+
+### extractTool changes
+
+- **Input schema changed**: `urls` is now first, `objective` is optional.
+- **Return value changed**: Now returns raw API response (`{ extract_id, results, errors, ... }`) instead of `{ searchParams, answer }`.
+
+**Before (v0.1.x):**
+```typescript
+const result = await extractTool.execute({
+  objective: 'Extract content',
+  urls: ['https://example.com'],
+  search_queries: ['keyword'],
+});
+console.log(result.answer.results);
+```
+
+**After (v0.2.0):**
+```typescript
+const result = await extractTool.execute({
+  urls: ['https://example.com'],
+  objective: 'Extract content', // optional
+});
+console.log(result.results);
 ```

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-describe('@parallel-web/ai-sdk-tools (default export)', () => {
-  describe('exports', () => {
+describe('@parallel-web/ai-sdk-tools exports', () => {
+  describe('default tools', () => {
     it('should export searchTool', async () => {
       const { searchTool } = await import('../index.js');
       expect(searchTool).toBeDefined();
@@ -19,8 +19,38 @@ describe('@parallel-web/ai-sdk-tools (default export)', () => {
     });
   });
 
-  describe('default export should match v5', () => {
-    it('should use inputSchema (v5 API)', async () => {
+  describe('factory functions', () => {
+    it('should export createSearchTool', async () => {
+      const { createSearchTool } = await import('../index.js');
+      expect(createSearchTool).toBeDefined();
+      expect(typeof createSearchTool).toBe('function');
+    });
+
+    it('should export createExtractTool', async () => {
+      const { createExtractTool } = await import('../index.js');
+      expect(createExtractTool).toBeDefined();
+      expect(typeof createExtractTool).toBe('function');
+    });
+
+    it('createSearchTool should return a tool with execute function', async () => {
+      const { createSearchTool } = await import('../index.js');
+      const customTool = createSearchTool({ mode: 'one-shot', max_results: 5 });
+      expect(customTool).toBeDefined();
+      expect(typeof customTool.execute).toBe('function');
+      expect(customTool.description).toBeDefined();
+    });
+
+    it('createExtractTool should return a tool with execute function', async () => {
+      const { createExtractTool } = await import('../index.js');
+      const customTool = createExtractTool({ full_content: true });
+      expect(customTool).toBeDefined();
+      expect(typeof customTool.execute).toBe('function');
+      expect(customTool.description).toBeDefined();
+    });
+  });
+
+  describe('AI SDK v5 compatibility', () => {
+    it('searchTool should use inputSchema (v5 API)', async () => {
       const { searchTool } = await import('../index.js');
       expect(searchTool).toHaveProperty('inputSchema');
       expect(searchTool).not.toHaveProperty('parameters');
@@ -34,9 +64,9 @@ describe('@parallel-web/ai-sdk-tools (default export)', () => {
   });
 
   describe('tool descriptions', () => {
-    it('searchTool should have web_search_parallel description', async () => {
+    it('searchTool should have web search description', async () => {
       const { searchTool } = await import('../index.js');
-      expect(searchTool.description).toContain('web_search_parallel');
+      expect(searchTool.description).toContain('web search');
     });
 
     it('extractTool should have extract description', async () => {
