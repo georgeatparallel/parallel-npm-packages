@@ -2,8 +2,11 @@
  * Extract tool for Parallel Web
  */
 
+declare const __PACKAGE_VERSION__: string;
+
 import { tool } from 'ai';
 import { z } from 'zod';
+import { Parallel } from 'parallel-web';
 import type {
   ExcerptSettings,
   FetchPolicy,
@@ -15,6 +18,12 @@ import { parallelClient } from '../client.js';
  * Options for creating a custom extract tool with code-supplied defaults.
  */
 export interface CreateExtractToolOptions {
+  /**
+   * API key for Parallel Web. If not provided, falls back to PARALLEL_API_KEY
+   * environment variable.
+   */
+  apiKey?: string;
+
   /**
    * Include excerpts from each URL relevant to the search objective and queries.
    * Can be a boolean or ExcerptSettings object. Defaults to true.
@@ -95,11 +104,21 @@ Ideal Use Cases:
  */
 export function createExtractTool(options: CreateExtractToolOptions = {}) {
   const {
+    apiKey,
     excerpts,
     full_content,
     fetch_policy,
     description = defaultExtractDescription,
   } = options;
+
+  const client = apiKey
+    ? new Parallel({
+        apiKey,
+        defaultHeaders: {
+          'X-Tool-Calling-Package': `npm:@parallel-web/ai-sdk-tools/v${__PACKAGE_VERSION__ ?? '0.0.0'}`,
+        },
+      })
+    : parallelClient;
 
   return tool({
     description,
@@ -112,7 +131,7 @@ export function createExtractTool(options: CreateExtractToolOptions = {}) {
       { urls, objective }: { urls: string[]; objective?: string },
       { abortSignal }: { abortSignal?: AbortSignal }
     ) {
-      return await parallelClient.beta.extract(
+      return await client.beta.extract(
         {
           urls,
           objective,

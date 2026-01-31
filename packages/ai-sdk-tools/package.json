@@ -1,6 +1,6 @@
 {
   "name": "@parallel-web/ai-sdk-tools",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI SDK tools for Parallel Web",
   "author": "Parallel Web",
   "license": "MIT",
@@ -34,7 +34,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/parallel-web/parallel-npm-packages",
+    "url": "git+https://github.com/parallel-web/parallel-npm-packages.git",
     "directory": "packages/ai-sdk-tools"
   },
   "publishConfig": {
