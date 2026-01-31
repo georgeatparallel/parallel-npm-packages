@@ -47,6 +47,28 @@ describe('@parallel-web/ai-sdk-tools exports', () => {
       expect(typeof customTool.execute).toBe('function');
       expect(customTool.description).toBeDefined();
     });
+
+    it('createSearchTool should accept apiKey option', async () => {
+      const { createSearchTool } = await import('../index.js');
+      const customTool = createSearchTool({
+        apiKey: 'test-api-key',
+        mode: 'one-shot',
+      });
+      expect(customTool).toBeDefined();
+      expect(typeof customTool.execute).toBe('function');
+      expect(customTool.description).toBeDefined();
+    });
+
+    it('createExtractTool should accept apiKey option', async () => {
+      const { createExtractTool } = await import('../index.js');
+      const customTool = createExtractTool({
+        apiKey: 'test-api-key',
+        full_content: true,
+      });
+      expect(customTool).toBeDefined();
+      expect(typeof customTool.execute).toBe('function');
+      expect(customTool.description).toBeDefined();
+    });
   });
 
   describe('AI SDK v5 compatibility', () => {

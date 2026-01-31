@@ -60,7 +60,9 @@ return result.toUIMessageStreamResponse();
 
 ## Factory Functions
 
-For more control over the tool configuration, use the factory functions to create tools with custom defaults:
+For more control over the tool configuration, use the factory functions to create tools with custom defaults.
+
+> **Note:** Both factory functions accept an optional `apiKey` parameter. If not provided, they fall back to the `PARALLEL_API_KEY` environment variable.
 
 ### createSearchTool
 
@@ -72,6 +74,7 @@ import { createSearchTool } from '@parallel-web/ai-sdk-tools';
 const myCustomSearchTool = createSearchTool({
   mode: 'one-shot',            // 'one-shot' returns more comprehensive results and longer excerpts to answer questions from a single response.
   max_results: 5,              // Limit to 5 results
+  apiKey: 'your-api-key',      // Optional: pass an API key, falls back to PARALLEL_API_KEY env variable
 });
 ```
 
@@ -87,6 +90,7 @@ const myExtractTool = createExtractTool({
   excerpts: {
     max_chars_per_result: 10000,
   },
+  apiKey: 'your-api-key',      // Optional: pass an API key, falls back to PARALLEL_API_KEY env variable
 });
 ```
 

@@ -2,8 +2,11 @@
  * Search tool for Parallel Web
  */
 
+declare const __PACKAGE_VERSION__: string;
+
 import { tool } from 'ai';
 import { z } from 'zod';
+import { Parallel } from 'parallel-web';
 import type {
   ExcerptSettings,
   FetchPolicy,
@@ -15,6 +18,12 @@ import { parallelClient } from '../client.js';
  * Options for creating a custom search tool with code-supplied defaults.
  */
 export interface CreateSearchToolOptions {
+  /**
+   * API key for Parallel Web. If not provided, falls back to PARALLEL_API_KEY
+   * environment variable.
+   */
+  apiKey?: string;
+
   /**
    * Default mode for search. 'agentic' returns concise, token-efficient results
    * for multi-step workflows. 'one-shot' returns comprehensive results with
@@ -115,6 +124,7 @@ Use the web search tool to search the web and access information from the web. T
  */
 export function createSearchTool(options: CreateSearchToolOptions = {}) {
   const {
+    apiKey,
     mode: defaultMode = 'agentic',
     max_results,
     excerpts,
@@ -122,6 +132,15 @@ export function createSearchTool(options: CreateSearchToolOptions = {}) {
     fetch_policy,
     description = defaultSearchDescription,
   } = options;
+
+  const client = apiKey
+    ? new Parallel({
+        apiKey,
+        defaultHeaders: {
+          'X-Tool-Calling-Package': `npm:@parallel-web/ai-sdk-tools/v${__PACKAGE_VERSION__ ?? '0.0.0'}`,
+        },
+      })
+    : parallelClient;
 
   return tool({
     description,
@@ -134,7 +153,7 @@ export function createSearchTool(options: CreateSearchToolOptions = {}) {
     }),
 
     execute: async function ({ objective, search_queries }, { abortSignal }) {
-      return await parallelClient.beta.search(
+      return await client.beta.search(
         {
           objective,
           search_queries,
