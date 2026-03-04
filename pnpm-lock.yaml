@@ -49,6 +49,25 @@ importers:
         specifier: ^5.0.0
         version: 5.0.76(zod@4.3.6)
 
+  packages/opencode-plugin:
+    dependencies:
+      parallel-web:
+        specifier: ^0.3.1
+        version: 0.3.1
+      zod:
+        specifier: ^4.1.0
+        version: 4.3.6
+    devDependencies:
+      '@opencode-ai/plugin':
+        specifier: ^0.15.0
+        version: 0.15.31
+      '@opencode-ai/sdk':
+        specifier: ^0.15.0
+        version: 0.15.31
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.21
+
 packages:
 
   '@ai-sdk/gateway@2.0.0':
@@ -424,6 +443,12 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@opencode-ai/plugin@0.15.31':
+    resolution: {integrity: sha512-htKKCq9Htljf7vX5ANLDB7bU7TeJYrl8LP2CQUtCAguKUpVvpj5tiZ+edlCdhGFEqlpSp+pkiTEY5LCv1muowg==}
+
+  '@opencode-ai/sdk@0.15.31':
+    resolution: {integrity: sha512-95HWBiNKQnwsubkR2E7QhBD/CH9yteZGrviWar0aKHWu8/RjWw9m7Znbv8DI+y6i2dMwBBcGQ8LJ7x0abzys4A==}
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -1554,6 +1579,9 @@ packages:
     resolution: {integrity: sha512-AyeEbWOu/TAXdxlV9wmGcR0+yh2j3vYPGOECcIj2S7MkrLyC7ne+oye2BKTItt0ii2PHk4cDy+95+LshzbXnGg==}
     engines: {node: '>=12.20'}
 
+  zod@4.1.8:
+    resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
+
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
@@ -1797,6 +1825,13 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
+
+  '@opencode-ai/plugin@0.15.31':
+    dependencies:
+      '@opencode-ai/sdk': 0.15.31
+      zod: 4.1.8
+
+  '@opencode-ai/sdk@0.15.31': {}
 
   '@opentelemetry/api@1.9.0': {}
 
@@ -2925,5 +2960,7 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   yocto-queue@1.2.1: {}
+
+  zod@4.1.8: {}
 
   zod@4.3.6: {}

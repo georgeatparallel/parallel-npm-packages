@@ -1,0 +1,58 @@
+{
+  "name": "@parallel-web/opencode-plugin",
+  "version": "0.1.0",
+  "description": "OpenCode plugin that replaces webfetch and websearch with Parallel Web APIs",
+  "author": "Parallel Web",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "parallel",
+    "web",
+    "search",
+    "fetch",
+    "ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parallel-web/parallel-npm-packages.git",
+    "directory": "packages/opencode-plugin"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "parallel-web": "^0.3.1",
+    "zod": "^4.1.0"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=0.15.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^0.15.0",
+    "@opencode-ai/sdk": "^0.15.0",
+    "@types/node": "^20.0.0"
+  }
+}

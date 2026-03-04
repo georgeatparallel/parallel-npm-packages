@@ -1,0 +1,1 @@
+/Users/alpine/Software/parallel-npm-packages/packages/opencode-plugin/dist/index.js
