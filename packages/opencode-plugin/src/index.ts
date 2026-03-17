@@ -2,7 +2,7 @@
  * @parallel-web/opencode-plugin
  *
  * OpenCode plugin that provides parallel-search and parallel-fetch tools
- * powered by Parallel Web APIs.
+ * powered by the Parallel CLI.
  *
  * These tools should be preferred over the built-in websearch and webfetch tools.
  * They provide high-quality search results and intelligent content extraction
@@ -10,24 +10,16 @@
  *
  * Authentication:
  * - Set PARALLEL_API_KEY environment variable, OR
- * - Run `opencode auth` and select "Parallel" to authenticate via OAuth or API key
+ * - Run `parallel-cli login`, OR
+ * - Run `opencode auth` and select "Parallel" to authenticate via CLI login or API key
  */
 
 import type { Plugin } from '@opencode-ai/plugin';
-import { Parallel } from 'parallel-web';
-import { createParallelClient } from './client.js';
+import { runParallelCli, runParallelCliJson } from './parallel-cli.js';
 import { createParallelSearchTool } from './tools/parallel-search.js';
 import { createParallelFetchTool } from './tools/parallel-fetch.js';
-import {
-  generatePKCE,
-  generateState,
-  buildAuthorizeUrl,
-  startOAuthServer,
-  stopOAuthServer,
-  waitForOAuthCallback,
-} from './oauth.js';
 
-declare const __PACKAGE_VERSION__: string;
+const CLI_AUTH_SENTINEL = '__parallel_cli_authenticated__';
 
 /**
  * Parallel Web plugin for OpenCode.
@@ -49,25 +41,18 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
     }
 
     // 2. Use stored API key from auth system
-    if (storedApiKey) {
+    if (storedApiKey && storedApiKey !== CLI_AUTH_SENTINEL) {
       return storedApiKey;
     }
 
     return undefined;
   };
 
-  /**
-   * Creates a Parallel client with current API key.
-   * Throws if no API key is available.
-   */
-  const getClient = (): Parallel => {
+  const getCliEnv = (): Record<string, string | undefined> => {
     const apiKey = getApiKey();
-    if (!apiKey) {
-      throw new Error(
-        'Parallel API key not configured. Set PARALLEL_API_KEY environment variable or run `opencode auth` and select "Parallel".'
-      );
-    }
-    return createParallelClient({ apiKey });
+    return {
+      PARALLEL_API_KEY: apiKey,
+    };
   };
 
   /**
@@ -75,20 +60,52 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
    */
   const validateApiKey = async (apiKey: string): Promise<boolean> => {
     try {
-      const testClient = new Parallel({
-        apiKey,
-        defaultHeaders: {
-          'X-Tool-Calling-Package': `npm:@parallel-web/opencode-plugin/v${__PACKAGE_VERSION__ ?? '0.0.0'}`,
-        },
+      const result = await runParallelCli(
+        [
+          'search',
+          'test connection',
+          '--mode',
+          'one-shot',
+          '--max-results',
+          '1',
+          '--json',
+        ],
+        {
+          env: {
+            PARALLEL_API_KEY: apiKey,
+          },
+        }
+      );
+
+      return result.exitCode === 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const loginWithCli = async (): Promise<boolean> => {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      return false;
+    }
+
+    try {
+      const loginResult = await runParallelCli(['login'], {
+        env: getCliEnv(),
+        inheritStdio: true,
       });
 
-      await testClient.beta.search({
-        objective: 'test connection',
-        search_queries: ['test'],
-        max_results: 1,
-      });
+      if (loginResult.exitCode !== 0) {
+        return false;
+      }
 
-      return true;
+      const status = await runParallelCliJson<{ authenticated?: boolean }>(
+        ['auth', '--json'],
+        {
+          env: getCliEnv(),
+        }
+      );
+
+      return status.authenticated === true;
     } catch {
       return false;
     }
@@ -97,40 +114,21 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
   return {
     // Register Parallel as an auth provider
     auth: {
-      provider: 'parallel',
+      provider: 'Parallel',
       methods: [
-        // OAuth method (browser-based)
+        // CLI login method (browser-based OAuth or device flow)
         {
-          type: 'oauth' as const,
-          label: 'Login with Parallel (browser)',
+          type: 'api' as const,
+          label: 'Login with Parallel CLI',
           async authorize() {
-            const { redirectUri } = await startOAuthServer();
-            const pkce = await generatePKCE();
-            const state = generateState();
-            const authUrl = buildAuthorizeUrl(redirectUri, pkce, state);
-
-            const callbackPromise = waitForOAuthCallback(pkce, state);
+            const loggedIn = await loginWithCli();
+            if (!loggedIn) {
+              return { type: 'failed' as const };
+            }
 
             return {
-              url: authUrl,
-              instructions:
-                'Complete authorization in your browser. This window will close automatically.',
-              method: 'auto' as const,
-              async callback() {
-                try {
-                  const accessToken = await callbackPromise;
-                  stopOAuthServer();
-
-                  // The access_token from Parallel OAuth IS the API key
-                  return {
-                    type: 'success' as const,
-                    key: accessToken,
-                  };
-                } catch {
-                  stopOAuthServer();
-                  return { type: 'failed' as const };
-                }
-              },
+              type: 'success' as const,
+              key: CLI_AUTH_SENTINEL,
             };
           },
         },
@@ -171,7 +169,6 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
       async loader(auth) {
         try {
           const authData = await auth();
-          // Auth can be API type (has key) or OAuth type
           if (
             authData &&
             'key' in authData &&
@@ -189,8 +186,8 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
     // Register parallel-search and parallel-fetch tools
     // These should be preferred over the built-in websearch and webfetch tools
     tool: {
-      'parallel-fetch': createParallelFetchTool(getClient),
-      'parallel-search': createParallelSearchTool(getClient),
+      'parallel-fetch': createParallelFetchTool(getCliEnv),
+      'parallel-search': createParallelSearchTool(getCliEnv),
     },
   };
 };

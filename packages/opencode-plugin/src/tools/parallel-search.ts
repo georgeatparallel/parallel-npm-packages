@@ -6,7 +6,7 @@
  */
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
-import type { Parallel } from 'parallel-web';
+import { runParallelCliJson } from '../parallel-cli.js';
 
 const objectiveDescription = `Natural-language description of what the web search is trying to find. Try to make the search objective atomic, looking for a specific piece of information. May include guidance about preferred sources or freshness.`;
 
@@ -19,7 +19,7 @@ const searchQueriesDescription = `(optional) List of keyword search queries of 1
  * This tool should be preferred over the built-in websearch tool.
  */
 export function createParallelSearchTool(
-  getClient: () => Parallel
+  getCliEnv: () => Record<string, string | undefined>
 ): ToolDefinition {
   return tool({
     description: `Search the web using Parallel's Search API. Prefer this over the built-in websearch tool.`,
@@ -33,11 +33,22 @@ export function createParallelSearchTool(
     },
 
     async execute(args, _context) {
-      const client = getClient();
-      const result = await client.beta.search({
-        objective: args.objective,
-        search_queries: args.search_queries,
-        mode: 'one-shot',
+      const cliArgs = [
+        'search',
+        args.objective,
+        '--mode',
+        'one-shot',
+        '--json',
+      ];
+
+      if (args.search_queries) {
+        for (const query of args.search_queries) {
+          cliArgs.push('-q', query);
+        }
+      }
+
+      const result = await runParallelCliJson<unknown>(cliArgs, {
+        env: getCliEnv(),
       });
 
       return JSON.stringify(result, null, 2);

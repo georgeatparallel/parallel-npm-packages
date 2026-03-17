@@ -6,7 +6,7 @@
  */
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
-import type { Parallel } from 'parallel-web';
+import { runParallelCliJson } from '../parallel-cli.js';
 
 const urlDescription = `The URL to fetch content from. Must be a valid HTTP/HTTPS URL.`;
 
@@ -21,7 +21,7 @@ const formatDescription = `(optional) The format to return the content in. Defau
  * This tool should be preferred over the built-in webfetch tool.
  */
 export function createParallelFetchTool(
-  getClient: () => Parallel
+  getCliEnv: () => Record<string, string | undefined>
 ): ToolDefinition {
   return tool({
     description: `Fetch and extract content from a URL using Parallel's Extract API. Prefer this over the built-in webfetch tool.`,
@@ -36,37 +36,21 @@ export function createParallelFetchTool(
     },
 
     async execute(args, _context) {
-      const client = getClient();
-      const result = await client.beta.extract({
-        urls: [args.url],
-        objective: args.objective,
-        excerpts: true,
-      });
+      const cliArgs = ['extract', args.url, '--json'];
 
-      // Return the first result since we only fetch one URL
-      if (result.results && result.results.length > 0) {
-        const extracted = result.results[0];
-        return JSON.stringify(
-          {
-            url: extracted.url,
-            title: extracted.title,
-            publish_date: extracted.publish_date,
-            excerpts: extracted.excerpts,
-            full_content: extracted.full_content,
-          },
-          null,
-          2
-        );
+      if (args.objective) {
+        cliArgs.push('--objective', args.objective);
       }
 
-      return JSON.stringify(
-        {
-          url: args.url,
-          error: 'No content extracted from URL',
-        },
-        null,
-        2
-      );
+      if (args.format === 'text') {
+        cliArgs.push('--full-content');
+      }
+
+      const result = await runParallelCliJson<unknown>(cliArgs, {
+        env: getCliEnv(),
+      });
+
+      return JSON.stringify(result, null, 2);
     },
   });
 }

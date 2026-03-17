@@ -51,9 +51,9 @@ importers:
 
   packages/opencode-plugin:
     dependencies:
-      parallel-web:
-        specifier: ^0.3.1
-        version: 0.3.1
+      parallel-web-cli:
+        specifier: ^0.2.0
+        version: 0.2.0
       zod:
         specifier: ^4.1.0
         version: 4.3.6
@@ -1179,6 +1179,11 @@ packages:
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
+
+  parallel-web-cli@0.2.0:
+    resolution: {integrity: sha512-0/qR3UgGUVhgZaevMBvRkNjRxj5L/ubY+WjrTpY69/6oBXgfbbo7jTZ9PhySSAjOFbQwvDlSCPi7vs6nQVBikQ==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   parallel-web@0.3.1:
     resolution: {integrity: sha512-1yLiqdjFFhwgZUV2qOLTvu36A3wiCld8/Y8Zu1FsGk6y4ov4cZPhXNGafjDkM68aFc1c5KVB9ZYpkJZZ/mZW/w==}
@@ -2598,6 +2603,8 @@ snapshots:
       p-limit: 3.1.0
 
   package-json-from-dist@1.0.1: {}
+
+  parallel-web-cli@0.2.0: {}
 
   parallel-web@0.3.1: {}
 

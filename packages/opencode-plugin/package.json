@@ -1,7 +1,7 @@
 {
   "name": "@parallel-web/opencode-plugin",
   "version": "0.1.0",
-  "description": "OpenCode plugin that replaces webfetch and websearch with Parallel Web APIs",
+  "description": "OpenCode plugin that replaces webfetch and websearch with Parallel CLI",
   "author": "Parallel Web",
   "license": "MIT",
   "type": "module",
@@ -44,7 +44,7 @@
     "access": "public"
   },
   "dependencies": {
-    "parallel-web": "^0.3.1",
+    "parallel-web-cli": "^0.2.0",
     "zod": "^4.1.0"
   },
   "peerDependencies": {
