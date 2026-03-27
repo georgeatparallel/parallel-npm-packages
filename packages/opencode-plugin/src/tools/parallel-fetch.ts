@@ -12,8 +12,6 @@ const urlDescription = `The URL to fetch content from. Must be a valid HTTP/HTTP
 
 const objectiveDescription = `(optional) Natural-language description of what information you're looking for from the URL. Helps extract the most relevant content.`;
 
-const formatDescription = `(optional) The format to return the content in. Defaults to markdown.`;
-
 /**
  * Creates the parallel-fetch tool that uses Parallel's Extract API.
  * Accepts a getter function to lazily obtain the client.
@@ -29,10 +27,6 @@ export function createParallelFetchTool(
     args: {
       url: tool.schema.string().describe(urlDescription),
       objective: tool.schema.string().optional().describe(objectiveDescription),
-      format: tool.schema
-        .enum(['markdown', 'text', 'html'])
-        .optional()
-        .describe(formatDescription),
     },
 
     async execute(args, _context) {
@@ -40,11 +34,13 @@ export function createParallelFetchTool(
 
       if (args.objective) {
         cliArgs.push('--objective', args.objective);
+      } else {
+        // according to best practices, without an objective, excerpts are redudantant with full content
+        cliArgs.push('--no-excerpts');
       }
 
-      if (args.format === 'text') {
-        cliArgs.push('--full-content');
-      }
+      // always output full content since objective may be null
+      cliArgs.push('--full-content');
 
       const result = await runParallelCliJson<unknown>(cliArgs, {
         env: getCliEnv(),

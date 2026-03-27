@@ -28,7 +28,7 @@ OpenCode plugin that adds `parallel-search` and `parallel-fetch` tools powered b
 3. Complete authorization in your browser/device flow
 
 
-**Option B: Environment variable* *
+**Option B: Environment variable**
 
 ```bash
 export PARALLEL_API_KEY=your_api_key
