@@ -5,6 +5,7 @@ Monorepo for @parallel-web npm packages.
 ## Packages
 
 - [`@parallel-web/ai-sdk-tools`](./packages/ai-sdk-tools) - AI SDK tools for Parallel Web
+- [`@parallel-web/opencode-plugin`](./packages/opencode-plugin) - Opencode plugin for Parallel Web
 
 ## Development
 

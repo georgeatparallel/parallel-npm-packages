@@ -1,0 +1,155 @@
+name: Publish opencode-plugin Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Confirm version is already bumped in package.json'
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-opencode-plugin
+  cancel-in-progress: false
+
+jobs:
+  publish-opencode-plugin-stable:
+    name: Publish opencode-plugin-stable Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint opencode-plugin
+        run: pnpm eslint packages/opencode-plugin
+
+      - name: Format check opencode-plugin
+        run: pnpm prettier --check packages/opencode-plugin
+
+      - name: Type check opencode-plugin
+        run: |
+          cd packages/opencode-plugin
+          pnpm typecheck
+
+      - name: Run tests for opencode-plugin
+        run: |
+          cd packages/opencode-plugin
+          pnpm test
+        env:
+          PARALLEL_API_KEY: ${{ secrets.PARALLEL_API_KEY }}
+
+      - name: Build opencode-plugin
+        run: |
+          cd packages/opencode-plugin
+          pnpm build
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Parallel Developers"
+          git config --global user.email "developers@parallel.ai"
+
+      - name: Get current version
+        id: version
+        run: |
+          cd packages/opencode-plugin
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Current version: ${VERSION}"
+
+          # Verify this version doesn't already have a tag
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Error: Tag v${VERSION} already exists. Please bump the version in package.json first."
+            exit 1
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          cd packages/opencode-plugin
+
+          # Get the previous version tag
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, generating changelog from all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from ${PREV_TAG} to HEAD"
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Parse conventional commits
+          FEATURES=$(echo "$COMMITS" | grep -E "^- feat(\(.+\))?:" || true)
+          FIXES=$(echo "$COMMITS" | grep -E "^- fix(\(.+\))?:" || true)
+          BREAKING=$(echo "$COMMITS" | grep -E "^- (feat|fix)(\(.+\))?!:" || echo "$COMMITS" | grep "BREAKING CHANGE" || true)
+
+          # Create changelog content
+          CHANGELOG="## v${{ steps.version.outputs.version }}\n\n"
+
+          if [ ! -z "$BREAKING" ]; then
+            CHANGELOG="${CHANGELOG}### ⚠️ Breaking Changes\n\n${BREAKING}\n\n"
+          fi
+
+          if [ ! -z "$FEATURES" ]; then
+            CHANGELOG="${CHANGELOG}### ✨ Features\n\n${FEATURES}\n\n"
+          fi
+
+          if [ ! -z "$FIXES" ]; then
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n\n${FIXES}\n\n"
+          fi
+
+          # Save changelog to file
+          echo -e "$CHANGELOG" > /tmp/changelog.md
+          cat /tmp/changelog.md
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Configure npm authentication
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PARALLEL_DEVELOPERS_PASSWORD }}" > ~/.npmrc
+
+      - name: Publish to npm
+        run: |
+          cd packages/opencode-plugin
+          npm publish --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PARALLEL_DEVELOPERS_PASSWORD }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: v${{ steps.version.outputs.version }}
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: false
+
+      - name: Log published version
+        run: |
+          echo "✅ Published @parallel-web/opencode-plugin@${{ steps.version.outputs.version }}"
+          echo "Install with: npm install @parallel-web/opencode-plugin"
