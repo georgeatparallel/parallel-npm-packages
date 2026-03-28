@@ -75,7 +75,7 @@ pnpm --filter @parallel-web/ai-sdk-tools test
 
 Packages are published to npm using automated GitHub Actions workflows.
 
-### Canary Releases 
+### Canary Releases
 
 Every push to `main` can be published to a canary release with version format `x.y.z-canary.{shortSHA}`.
 
@@ -84,6 +84,7 @@ Every push to `main` can be published to a canary release with version format `x
 - Includes full CI validation before publishing
 
 **Install canary version:**
+
 ```bash
 npm install @parallel-web/ai-sdk-tools@canary
 ```
@@ -106,8 +107,35 @@ Stable releases are triggered manually via GitHub Actions:
    - Create GitHub release
 
 **Install stable version:**
+
 ```bash
 npm install @parallel-web/ai-sdk-tools
+```
+
+### Manual Publishing (Local)
+
+If the CI publish workflow fails partway through (e.g., the git tag was pushed but `npm publish` failed), the workflow isn't idempotent and can't simply be re-run. Use these steps to finish the publish locally.
+
+**1. Authenticate with npm:**
+
+```bash
+# Either log in interactively:
+npm login
+
+# verify with
+npm whoami
+```
+
+**4. Publish:**
+
+```bash
+cd packages/<package-name>
+
+# Dry-run first to verify tarball contents
+npm publish --dry-run --tag latest --access public
+
+# Publish for real
+npm publish --tag latest --access public
 ```
 
 ### Conventional Commits
@@ -133,4 +161,3 @@ Required GitHub repository secret:
 ## License
 
 MIT
-
