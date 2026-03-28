@@ -5,8 +5,8 @@
   "description": "Monorepo for @parallel-web npm packages",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "vitest",
-    "test:ci": "vitest run",
+    "test": "pnpm -r test",
+    "test:ci": "pnpm -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
