@@ -52,7 +52,7 @@ importers:
   packages/opencode-plugin:
     dependencies:
       parallel-web-cli:
-        specifier: '*'
+        specifier: 0.2.0
         version: 0.2.0
       zod:
         specifier: ^4.1.0
