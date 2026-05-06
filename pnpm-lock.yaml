@@ -74,8 +74,8 @@ importers:
         specifier: ^0.72.0
         version: 0.72.0(ws@8.20.0)(zod@4.3.6)
       parallel-web-cli:
-        specifier: 0.2.0
-        version: 0.2.0
+        specifier: 0.3.0-rc3
+        version: 0.3.0-rc3
       typebox:
         specifier: ^1.1.37
         version: 1.1.37
@@ -1971,6 +1971,11 @@ packages:
 
   parallel-web-cli@0.2.0:
     resolution: {integrity: sha512-0/qR3UgGUVhgZaevMBvRkNjRxj5L/ubY+WjrTpY69/6oBXgfbbo7jTZ9PhySSAjOFbQwvDlSCPi7vs6nQVBikQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  parallel-web-cli@0.3.0-rc3:
+    resolution: {integrity: sha512-U4RRyfTc9ZSbvv+cRK8+T9H/gpDJGLhwd4RGQb8xNENZ3b1EVdhXA5V/vWPFEtQ2MR8kX52inNtamzmojcYoYQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -4743,6 +4748,8 @@ snapshots:
   package-json-from-dist@1.0.1: {}
 
   parallel-web-cli@0.2.0: {}
+
+  parallel-web-cli@0.3.0-rc3: {}
 
   parallel-web@0.3.1: {}
 
