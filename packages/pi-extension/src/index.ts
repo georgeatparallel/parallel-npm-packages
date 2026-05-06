@@ -30,8 +30,8 @@ const WEB_GROUNDING_GUIDANCE = `
 
 You should proactively use available web tools to ground your answers when doing so would improve correctness, freshness, or source quality.
 
-- Do not shy away from using web_search when the task involves current information, external facts, source discovery, recent changes, or any claim you are not highly confident about.
-- Do not shy away from using web_fetch when the user provides a URL, when a search result should be verified against the source, or when primary-source content would improve the answer.
+- Use web_search when the task involves current information, external facts, source discovery, recent changes, or any claim you are not highly confident about.
+- Use web_fetch when the user provides a URL, when a search result should be verified against the source, or when primary-source content would improve the answer.
 - Prefer grounded, sourced answers over unsupported recall when freshness or factual precision matters.
 - If a grounded answer would likely be better than answering from memory, use the web tools first.
 `;

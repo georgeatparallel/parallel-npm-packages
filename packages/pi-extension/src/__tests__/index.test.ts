@@ -126,12 +126,8 @@ describe('@parallel-web/pi-extension', () => {
       systemPrompt: expect.stringContaining('Base system prompt'),
     });
     expect(result.systemPrompt).toContain('Grounding and web usage');
-    expect(result.systemPrompt).toContain(
-      'Do not shy away from using web_search'
-    );
-    expect(result.systemPrompt).toContain(
-      'Do not shy away from using web_fetch'
-    );
+    expect(result.systemPrompt).toContain('Use web_search');
+    expect(result.systemPrompt).toContain('Use web_fetch');
   });
 
   it('parallel-login should run cli login and notify on success', async () => {
