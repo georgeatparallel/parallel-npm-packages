@@ -1,11 +1,12 @@
 {
   "name": "@parallel-web/pi-extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Add web search and web fetch to your pi agent",
   "author": "Parallel Web",
   "license": "MIT",
   "type": "module",
   "pi": {
+    "image": "https://assets.parallel.ai/white-parallel-avatar-540.png",
     "extensions": [
       "./dist/index.js"
     ]
@@ -20,7 +21,7 @@
     "typebox": "^1.1.37"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "^0.72.0"
+    "@mariozechner/pi-coding-agent": "*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"
@@ -33,6 +34,7 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
+    "pi-package",
     "pi.dev",
     "pi agent",
     "extension",
