@@ -1,0 +1,146 @@
+name: Publish pi-extension Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Confirm version is already bumped in package.json'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
+concurrency:
+  group: publish-pi-extension-stable
+  cancel-in-progress: false
+
+jobs:
+  publish-pi-extension-stable:
+    name: Publish pi-extension Stable Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint pi-extension
+        run: pnpm eslint packages/pi-extension
+
+      - name: Format check pi-extension
+        run: pnpm prettier --check packages/pi-extension
+
+      - name: Type check pi-extension
+        run: |
+          cd packages/pi-extension
+          pnpm typecheck
+
+      - name: Run tests for pi-extension
+        run: |
+          cd packages/pi-extension
+          pnpm test
+
+      - name: Build pi-extension
+        run: |
+          cd packages/pi-extension
+          pnpm build
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Parallel Developers"
+          git config --global user.email "developers@parallel.ai"
+
+      - name: Get current version
+        id: version
+        run: |
+          cd packages/pi-extension
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Current version: ${VERSION}"
+
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Error: Tag v${VERSION} already exists. Please bump the version in package.json first."
+            exit 1
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          cd packages/pi-extension
+
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, generating changelog from all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from ${PREV_TAG} to HEAD"
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          FEATURES=$(echo "$COMMITS" | grep -E "^- feat(\(.+\))?:" || true)
+          FIXES=$(echo "$COMMITS" | grep -E "^- fix(\(.+\))?:" || true)
+          BREAKING=$(echo "$COMMITS" | grep -E "^- (feat|fix)(\(.+\))?!:" || echo "$COMMITS" | grep "BREAKING CHANGE" || true)
+
+          CHANGELOG="## v${{ steps.version.outputs.version }}\n\n"
+
+          if [ ! -z "$BREAKING" ]; then
+            CHANGELOG="${CHANGELOG}### ⚠️ Breaking Changes\n\n${BREAKING}\n\n"
+          fi
+
+          if [ ! -z "$FEATURES" ]; then
+            CHANGELOG="${CHANGELOG}### ✨ Features\n\n${FEATURES}\n\n"
+          fi
+
+          if [ ! -z "$FIXES" ]; then
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n\n${FIXES}\n\n"
+          fi
+
+          echo -e "$CHANGELOG" > /tmp/changelog.md
+          cat /tmp/changelog.md
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Publish to npm
+        run: |
+          cd packages/pi-extension
+          npm publish --tag latest --access public
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: v${{ steps.version.outputs.version }}
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: false
+
+      - name: Log published version
+        run: |
+          echo "✅ Published @parallel-web/pi-extension@${{ steps.version.outputs.version }}"
+          echo "Install with: npm install @parallel-web/pi-extension"

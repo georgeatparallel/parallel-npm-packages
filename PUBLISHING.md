@@ -12,6 +12,7 @@ This repository uses package-specific workflows for publishing to npm. Each pack
 **Current packages:**
 - `@parallel-web/ai-sdk-tools` - AI SDK tools for Parallel Web
 - `@parallel-web/opencode-plugin` - Opencode plugin for Parallel Web
+- `@parallel-web/pi-extension` - Pi extension for Parallel Web
 
 **Note**: This monorepo is designed to support multiple packages. When adding new packages, create dedicated workflows following the naming pattern: `publish-{package-name}-canary.yml` and `publish-{package-name}-stable.yml`.
 
@@ -440,4 +441,3 @@ For issues with publishing:
 2. Verify npm token permissions
 3. Review this guide's troubleshooting section
 4. Contact repository maintainers
-
