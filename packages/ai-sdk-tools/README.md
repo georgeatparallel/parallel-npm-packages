@@ -1,6 +1,6 @@
 # @parallel-web/ai-sdk-tools
 
-AI SDK tools for Parallel Web, built for Vercel's AI SDK v5.
+AI SDK tools for Parallel Web, built for Vercel's AI SDK v6.
 
 ## Installation
 
@@ -12,7 +12,7 @@ pnpm add ai @parallel-web/ai-sdk-tools
 yarn add ai @parallel-web/ai-sdk-tools
 ```
 
-> **Note:** This package requires AI SDK v5. For AI SDK v4, use `parameters` instead of `inputSchema` when defining tools manually with the `parallel-web` SDK.
+> **Note:** This package requires AI SDK v6. If you're still on AI SDK v5, install the last v5-compatible release instead: `npm install @parallel-web/ai-sdk-tools@0.2.1`.
 
 ## Usage
 

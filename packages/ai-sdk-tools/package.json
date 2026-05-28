@@ -1,6 +1,6 @@
 {
   "name": "@parallel-web/ai-sdk-tools",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "AI SDK tools for Parallel Web",
   "author": "Parallel Web",
   "license": "MIT",
@@ -45,10 +45,10 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "ai": "^5.0.0"
+    "ai": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "ai": "^5.0.0"
+    "ai": "^6.0.0"
   }
 }

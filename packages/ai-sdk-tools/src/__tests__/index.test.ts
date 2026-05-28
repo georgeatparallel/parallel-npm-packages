@@ -71,14 +71,14 @@ describe('@parallel-web/ai-sdk-tools exports', () => {
     });
   });
 
-  describe('AI SDK v5 compatibility', () => {
-    it('searchTool should use inputSchema (v5 API)', async () => {
+  describe('AI SDK v6 compatibility', () => {
+    it('searchTool should use inputSchema (v6 API)', async () => {
       const { searchTool } = await import('../index.js');
       expect(searchTool).toHaveProperty('inputSchema');
       expect(searchTool).not.toHaveProperty('parameters');
     });
 
-    it('extractTool should use inputSchema (v5 API)', async () => {
+    it('extractTool should use inputSchema (v6 API)', async () => {
       const { extractTool } = await import('../index.js');
       expect(extractTool).toHaveProperty('inputSchema');
       expect(extractTool).not.toHaveProperty('parameters');
