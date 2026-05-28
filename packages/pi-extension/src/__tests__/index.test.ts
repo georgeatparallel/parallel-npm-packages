@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from '@mariozechner/pi-coding-agent';
 
 const mocks = vi.hoisted(() => ({
   getParallelApiKey: vi.fn(),
@@ -60,7 +64,7 @@ function createToolContext(overrides: Record<string, unknown> = {}) {
       input: vi.fn(),
     },
     ...overrides,
-  } as any;
+  } as unknown as ExtensionContext;
 }
 
 describe('@parallel-web/pi-extension', () => {
@@ -80,7 +84,7 @@ describe('@parallel-web/pi-extension', () => {
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
 
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     expect(pi.registerCommand).toHaveBeenCalledTimes(1);
     expect(pi.registerCommand).toHaveBeenCalledWith(
@@ -128,7 +132,7 @@ describe('@parallel-web/pi-extension', () => {
   it('should append web grounding guidance to the system prompt when web tools are active', async () => {
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const handler = getEventHandler(pi, 'before_agent_start');
     const result = await handler({
@@ -149,7 +153,7 @@ describe('@parallel-web/pi-extension', () => {
   it('should suppress overlapping Parallel skills from the system prompt', async () => {
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const handler = getEventHandler(pi, 'before_agent_start');
     const result = await handler({
@@ -187,7 +191,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const command = getRegisteredCommand(pi, 'parallel-login');
     const ctx = createToolContext();
@@ -209,7 +213,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
     const result = await searchTool.execute(
@@ -245,7 +249,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
     const ctx = createToolContext({
@@ -293,7 +297,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
     const ctx = createToolContext({
@@ -330,7 +334,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
 
@@ -355,7 +359,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const fetchTool = getRegisteredTool(pi, 'web_fetch');
     const result = await fetchTool.execute(
@@ -396,7 +400,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
     const result = await searchTool.execute(
@@ -416,7 +420,7 @@ describe('@parallel-web/pi-extension', () => {
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
-    extension(pi as any);
+    extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
     await searchTool.execute(
