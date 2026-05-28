@@ -1,0 +1,38 @@
+{
+  "name": "@parallel-web/oauth",
+  "version": "0.1.0",
+  "description": "Shared PKCE OAuth helper for authenticating with platform.parallel.ai from CLI/desktop integrations",
+  "author": "Parallel Web",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "parallel",
+    "oauth",
+    "pkce"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parallel-web/parallel-npm-packages.git",
+    "directory": "packages/parallel-oauth"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

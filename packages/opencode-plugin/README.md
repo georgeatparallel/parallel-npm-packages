@@ -1,6 +1,6 @@
 # @parallel-web/opencode-plugin
 
-OpenCode plugin that adds `parallel-search` and `parallel-fetch` tools powered by [Parallel Web](https://parallel.ai) through `parallel-cli`.
+OpenCode plugin that adds `parallel-search` and `parallel-fetch` tools powered by [Parallel Web](https://parallel.ai)'s Search and Extract APIs.
 
 **Why use Parallel tools?**
 
@@ -21,12 +21,13 @@ OpenCode plugin that adds `parallel-search` and `parallel-fetch` tools powered b
 
 ### 2. Authenticate
 
-**Option A: Parallel CLI login (recommended)**
+**Option A: Browser login (recommended)**
 
 1. Run `opencode auth login`
-2. Select **"Parallel"** → **"Login with Parallel CLI"** OR **Input API key from platform.parallel.ai**
-3. Complete authorization in your browser/device flow
+2. Select **"Parallel"** → **"Login with Parallel (browser)"**
+3. Complete authorization in your browser; the plugin stores the resulting API key in OpenCode's auth store.
 
+Or pick **"Enter API Key manually"** to paste a key from [platform.parallel.ai](https://platform.parallel.ai).
 
 **Option B: Environment variable**
 
@@ -35,8 +36,6 @@ export PARALLEL_API_KEY=your_api_key
 ```
 
 Get your API key at [platform.parallel.ai](https://platform.parallel.ai).
-
-The plugin invokes `parallel-cli` under the hood for both tools.
 
 ## Tools
 
@@ -56,6 +55,27 @@ Search for the latest developments in AI safety research
 ```
 Fetch https://docs.parallel.ai/api-reference
 ```
+
+## Local development
+
+OpenCode auto-loads plugins from `~/.config/opencode/plugins/`, so you can test
+local changes by building the package and pointing that directory at the build
+output with a symlink:
+
+```bash
+# from the repo root
+pnpm build
+ln -sfn "$(pwd)/packages/opencode-plugin/dist" ~/.config/opencode/plugins
+```
+
+That leaves `~/.config/opencode/plugins` as a symlink to the plugin's `dist/`:
+
+```
+plugins@ -> /Users/you/Software/parallel-npm-packages/packages/opencode-plugin/dist/
+```
+
+Restart `opencode` and the plugin loads at startup. Each `pnpm build` is picked
+up on the next restart.
 
 ## License
 

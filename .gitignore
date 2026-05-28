@@ -35,3 +35,6 @@ yarn-error.log*
 temp/
 tmp/
 
+# Local opencode plugin scaffolding (npm lockfile in a pnpm repo)
+.opencode/
+

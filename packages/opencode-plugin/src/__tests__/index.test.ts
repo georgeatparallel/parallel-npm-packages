@@ -72,6 +72,40 @@ describe('@parallel-web/opencode-plugin exports', () => {
       expect(Array.isArray(pluginConfig.auth?.methods)).toBe(true);
     });
 
+    it('should expose the browser login as an oauth method', async () => {
+      const { ParallelWebPlugin } = await import('../index.js');
+      const mockContext = {} as Parameters<typeof ParallelWebPlugin>[0];
+      const pluginConfig = await ParallelWebPlugin(mockContext);
+
+      // The browser flow must be `type: 'oauth'`; with `type: 'api'` OpenCode
+      // just prompts for a key instead of running the browser flow.
+      const browserMethod = pluginConfig.auth?.methods.find((method) =>
+        method.label.includes('browser')
+      );
+      expect(browserMethod?.type).toBe('oauth');
+
+      const manualMethod = pluginConfig.auth?.methods.find((method) =>
+        method.label.includes('manually')
+      );
+      expect(manualMethod?.type).toBe('api');
+    });
+
+    it('declares Parallel as a model-less provider so Provider.list does not crash', async () => {
+      const { ParallelWebPlugin } = await import('../index.js');
+      const mockContext = {} as Parameters<typeof ParallelWebPlugin>[0];
+      const pluginConfig = await ParallelWebPlugin(mockContext);
+
+      // Without a provider definition, OpenCode crashes building the unknown
+      // "Parallel" provider once a credential is stored. The empty `models`
+      // map keeps it out of the model picker.
+      const config = {} as Parameters<
+        NonNullable<typeof pluginConfig.config>
+      >[0];
+      await pluginConfig.config?.(config);
+      expect(config.provider?.['Parallel']).toBeDefined();
+      expect(config.provider?.['Parallel']?.models).toEqual({});
+    });
+
     it('should register parallel-search and parallel-fetch tools', async () => {
       const { ParallelWebPlugin } = await import('../index.js');
       const mockContext = {} as Parameters<typeof ParallelWebPlugin>[0];

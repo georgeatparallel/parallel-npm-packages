@@ -15,6 +15,7 @@ export default defineConfig({
   treeshake: true,
   minify: false,
   outDir: 'dist',
+  noExternal: ['@parallel-web/oauth'],
   define: {
     __PACKAGE_VERSION__: JSON.stringify(pkg.version),
   },
