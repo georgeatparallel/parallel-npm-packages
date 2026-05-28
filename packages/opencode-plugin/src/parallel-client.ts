@@ -10,6 +10,7 @@ export interface ParallelSearchInput {
 export interface ParallelExtractInput {
   urls: string[];
   objective?: string;
+  search_queries?: string[];
 }
 
 function createParallelClient(apiKey: string) {
@@ -43,13 +44,16 @@ export async function runParallelExtract(
   signal?: AbortSignal
 ) {
   const client = createParallelClient(apiKey);
+  // Rely on the default excerpt behavior: with an objective/search_queries the
+  // excerpts are focused on the relevant content; without them Extract returns
+  // whole-page markdown. We intentionally do NOT force `full_content` — enabling
+  // it without an objective/search_queries makes excerpts redundant (and the API
+  // warns about it). See https://docs.parallel.ai/extract/best-practices.
   return await client.extract(
     {
       urls: input.urls,
       objective: input.objective,
-      advanced_settings: {
-        full_content: true,
-      },
+      search_queries: input.search_queries,
     },
     { signal }
   );

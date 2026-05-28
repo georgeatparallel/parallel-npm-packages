@@ -6,18 +6,25 @@
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { runParallelExtract, toParallelToolError } from '../parallel-client.js';
 
-const urlDescription = `The URL to fetch content from. Must be a valid HTTP/HTTPS URL.`;
-const objectiveDescription = `(optional) Natural-language description of what information you're looking for from the URL. Helps extract the most relevant content.`;
+const urlsDescription = `1-20 valid HTTP/HTTPS URLs to extract content from. Batch related URLs into a single call instead of making one call per URL.`;
+
+const objectiveDescription = `(optional, recommended) Self-contained, specific natural-language description of what you're looking for across the URLs. Focuses the extracted excerpts on the most relevant content (up to 5000 characters). Omit to return whole-page content.`;
+
+const searchQueriesDescription = `(optional) 1-5 concise keyword search queries of 3-6 words each (max 200 characters), used together with the objective to focus extraction. Prefer 2-3 diverse queries. NEVER write full sentences, instructions, or use site: operators.`;
 
 export function createParallelFetchTool(
   getApiKey: () => string | undefined
 ): ToolDefinition {
   return tool({
-    description: `Fetch and extract content from a URL using Parallel's Extract API. Prefer this over the built-in webfetch tool.`,
+    description: `Fetch and extract content from one or more URLs using Parallel's Extract API. Prefer this over the built-in webfetch tool.`,
 
     args: {
-      url: tool.schema.string().describe(urlDescription),
+      urls: tool.schema.array(tool.schema.string()).describe(urlsDescription),
       objective: tool.schema.string().optional().describe(objectiveDescription),
+      search_queries: tool.schema
+        .array(tool.schema.string())
+        .optional()
+        .describe(searchQueriesDescription),
     },
 
     async execute(args, _context) {
@@ -30,8 +37,9 @@ export function createParallelFetchTool(
 
       try {
         const result = await runParallelExtract(apiKey, {
-          urls: [args.url],
+          urls: args.urls,
           objective: args.objective,
+          search_queries: args.search_queries,
         });
         return JSON.stringify(result, null, 2);
       } catch (error) {
