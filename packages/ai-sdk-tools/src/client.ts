@@ -18,6 +18,10 @@ export const parallelClient = new Proxy({} as Parallel, {
         },
       });
     }
-    return _parallelClient[prop];
+    const value = _parallelClient[prop];
+    // Bind methods (e.g. `search`, `extract`) to the real client instance.
+    // They read private fields via `this`; returning them unbound would make
+    // `this` the Proxy and throw "Cannot read private member" at call time.
+    return typeof value === 'function' ? value.bind(_parallelClient) : value;
   },
 });

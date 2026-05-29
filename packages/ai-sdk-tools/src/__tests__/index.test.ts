@@ -163,6 +163,25 @@ describe('@parallel-web/ai-sdk-tools exports', () => {
     });
   });
 
+  describe('shared parallelClient', () => {
+    it('binds methods to the underlying client instance', async () => {
+      // The lazy client is constructed on first property access and requires a
+      // key, so provide a dummy one for this no-network check.
+      process.env.PARALLEL_API_KEY = process.env.PARALLEL_API_KEY ?? 'test-key';
+      const { parallelClient } = await import('../client.js');
+
+      expect(typeof parallelClient.search).toBe('function');
+      expect(typeof parallelClient.extract).toBe('function');
+
+      // Methods must be bound to the real instance. An unbound v1 method would
+      // run with `this` set to the Proxy and throw "Cannot read private member"
+      // when it reads private fields. Function.prototype.bind names the result
+      // "bound <name>", which confirms the proxy binds before returning.
+      expect(parallelClient.search.name).toBe('bound search');
+      expect(parallelClient.extract.name).toBe('bound extract');
+    });
+  });
+
   describe('tool descriptions', () => {
     it('searchTool should have web search description', async () => {
       const { searchTool } = await import('../index.js');

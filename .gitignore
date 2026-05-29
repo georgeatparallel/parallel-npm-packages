@@ -17,7 +17,6 @@ coverage/
 .envrc
 
 .direnv
-
 flake.nix
 flake.lock
 
