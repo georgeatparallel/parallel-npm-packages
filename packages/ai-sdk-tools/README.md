@@ -20,19 +20,19 @@ Add `PARALLEL_API_KEY` obtained from [Parallel Platform](https://platform.parall
 
 ### Search Tool
 
-`searchTool` uses [Parallel's Search API](https://docs.parallel.ai/api-reference/search-beta/search) to perform web searches and return LLM-optimized results.
+`searchTool` uses [Parallel's v1 Search API](https://docs.parallel.ai/api-reference/search/search) to perform web searches and return LLM-optimized results.
 
 **Input schema:**
-- `objective` (required): Natural-language description of what the web search is trying to find
-- `search_queries` (optional): List of keyword search queries (1-6 words each)
-- `mode` (optional): `'agentic'` (default) for concise results in agentic loops, or `'one-shot'` for comprehensive single-response results
+- `search_queries` (required): List of concise keyword search queries (3-6 words each, at least one, max 5). Provide 2-3 for best results.
+- `objective` (optional): Natural-language description of the underlying question or goal driving the search. Recommended alongside `search_queries` for best results.
+- `mode` (optional): `'advanced'` (default) for higher quality with advanced retrieval and compression, or `'basic'` for the lowest latency
 
 ### Extract Tool
 
-`extractTool` uses [Parallel's Extract API](https://docs.parallel.ai/api-reference/extract-beta/extract) to fetch and extract relevant content from specific URLs.
+`extractTool` uses [Parallel's v1 Extract API](https://docs.parallel.ai/api-reference/extract/extract) to fetch and extract relevant content from specific URLs.
 
 **Input schema:**
-- `urls` (required): List of URLs to extract content from (max 10)
+- `urls` (required): List of URLs to extract content from (max 20)
 - `objective` (optional): Natural-language description of what information you're looking for
 
 ### Basic Example
@@ -66,27 +66,30 @@ For more control over the tool configuration, use the factory functions to creat
 
 ### createSearchTool
 
-Create a search tool with custom defaults for mode, max_results, excerpts, source_policy, or fetch_policy.
+Create a search tool with custom defaults for `mode`, `max_chars_total`, `client_model`, and advanced settings (`max_results`, `excerpts`, `location`, `source_policy`, `fetch_policy`). Advanced settings are nested under `advanced_settings` in the v1 API; pass them as flat options here and they're assembled for you.
+
+> **Best practice:** Use advanced settings only when strictly required — restrictive parameters such as `source_policy`, `location`, and `max_results` can unnecessarily limit results and reduce quality.
 
 ```typescript
 import { createSearchTool } from '@parallel-web/ai-sdk-tools';
 
 const myCustomSearchTool = createSearchTool({
-  mode: 'one-shot',            // 'one-shot' returns more comprehensive results and longer excerpts to answer questions from a single response.
-  max_results: 5,              // Limit to 5 results
+  mode: 'basic',               // 'basic' offers the lowest latency; 'advanced' (default) is higher quality
+  max_results: 5,              // Limit to 5 results (nested under advanced_settings)
+  client_model: 'gpt-4o',      // Optional: tailor result formatting to the consuming model
   apiKey: 'your-api-key',      // Optional: pass an API key, falls back to PARALLEL_API_KEY env variable
 });
 ```
 
 ### createExtractTool
 
-Create an extract tool with custom defaults for excerpts, full_content, or fetch_policy.
+Create an extract tool with custom defaults for `excerpts`, `full_content`, `fetch_policy`, `max_chars_total`, and `client_model`. In the v1 API excerpts are always returned; their size is controlled via `excerpts`.
 
 ```typescript
 import { createExtractTool } from '@parallel-web/ai-sdk-tools';
 
 const myExtractTool = createExtractTool({
-  full_content: true,          // Include full page content
+  full_content: true,          // Include full page content (nested under advanced_settings)
   excerpts: {
     max_chars_per_result: 10000,
   },
@@ -110,13 +113,15 @@ const parallel = new Parallel({
 const webSearch = tool({
   description: 'Search the web for information.',
   inputSchema: z.object({
-    query: z.string().describe("The user's question"),
+    search_queries: z.array(z.string()).min(1).describe('Keyword search queries'),
+    objective: z.string().nullable().optional().describe("The user's question"),
   }),
-  execute: async ({ query }) => {
-    const result = await parallel.beta.search({
-      objective: query,
-      mode: 'agentic',
-      max_results: 5,
+  execute: async ({ search_queries, objective }) => {
+    const result = await parallel.search({
+      search_queries,
+      objective,
+      mode: 'advanced',
+      advanced_settings: { max_results: 5 },
     });
     return result;
   },
@@ -125,9 +130,10 @@ const webSearch = tool({
 
 ## API Reference
 
-- [Search API Documentation](https://docs.parallel.ai/search/search-quickstart)
-- [Extract API Documentation](https://docs.parallel.ai/extract/extract-quickstart)
+- [Search API Reference](https://docs.parallel.ai/api-reference/search/search)
+- [Extract API Reference](https://docs.parallel.ai/api-reference/extract/extract)
 - [Search API Best Practices](https://docs.parallel.ai/search/best-practices)
+- [Extract API Best Practices](https://docs.parallel.ai/extract/best-practices)
 
 ## Response Format
 
@@ -138,6 +144,7 @@ Both tools return the raw API response from Parallel:
 ```typescript
 {
   search_id: string;
+  session_id: string;
   results: Array<{
     url: string;
     title?: string;
@@ -154,10 +161,11 @@ Both tools return the raw API response from Parallel:
 ```typescript
 {
   extract_id: string;
+  session_id: string;
   results: Array<{
     url: string;
     title?: string;
-    excerpts?: string[];
+    excerpts: string[];
     full_content?: string;
     publish_date?: string;
   }>;
@@ -171,6 +179,22 @@ Both tools return the raw API response from Parallel:
   warnings?: Array<{ code: string; message: string }>;
 }
 ```
+
+## Migration to v1.0.0 (AI SDK v6 + v1 Search/Extract API)
+
+Version 1.0.0 targets [AI SDK v6](https://ai-sdk.dev/docs/migration-guides/migration-guide-6-0) and Parallel's v1 [Search](https://docs.parallel.ai/search/search-migration-guide) and [Extract](https://docs.parallel.ai/extract/extract-migration-guide) APIs (`parallel-web@^0.5.0`). If you need AI SDK v5, install `@parallel-web/ai-sdk-tools@0.2.1`.
+
+### searchTool changes
+
+- **`search_queries` is now required** (at least one query); `objective` is optional but recommended alongside it.
+- **`mode` values changed** from `'agentic'`/`'one-shot'` to `'basic'`/`'advanced'`, defaulting to `'advanced'`. Map `'agentic'`/`'one-shot'` → `'basic'`.
+- **`createSearchTool` advanced options** (`max_results`, `excerpts`, `source_policy`, `fetch_policy`, plus the new `location`) are now sent under `advanced_settings`; new top-level options `max_chars_total` and `client_model` are also available. You still pass them as flat options.
+
+### extractTool changes
+
+- **Up to 20 URLs** per request (was 10).
+- **Excerpts are always returned**; the `excerpts` option no longer accepts a boolean — pass excerpt settings (e.g. `{ max_chars_per_result }`) to control size.
+- **`createExtractTool` options** `full_content` and `fetch_policy` are now sent under `advanced_settings`; new top-level options `max_chars_total` and `client_model` are also available.
 
 ## Migration from v0.1.x
 

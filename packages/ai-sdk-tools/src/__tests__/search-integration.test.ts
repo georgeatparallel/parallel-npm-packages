@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { searchTool, createSearchTool } from '../index.js';
-import type { SearchResult } from 'parallel-web/resources/beta/beta.mjs';
+import type { SearchResult } from 'parallel-web/resources/top-level.mjs';
 
 type SearchParams = Parameters<NonNullable<typeof searchTool.execute>>[0];
 
@@ -26,7 +26,7 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
 
     describe.concurrent('basic search execution', () => {
       it(
-        'should execute search with default agentic mode',
+        'should execute search with default advanced mode',
         async () => {
           const result = await executeSearch(searchTool, {
             objective: 'Find information about TypeScript',
@@ -42,12 +42,12 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
       );
 
       it(
-        'should execute search with one-shot mode',
+        'should execute search with basic mode',
         async () => {
           const result = await executeSearch(searchTool, {
             objective: 'Information about Node.js',
             search_queries: ['Node.js'],
-            mode: 'one-shot',
+            mode: 'basic',
           });
 
           expect(result).toBeDefined();
@@ -58,12 +58,12 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
       );
 
       it(
-        'should execute search with agentic mode explicitly',
+        'should execute search with advanced mode explicitly',
         async () => {
           const result = await executeSearch(searchTool, {
             objective: 'React documentation',
             search_queries: ['React hooks'],
-            mode: 'agentic',
+            mode: 'advanced',
           });
 
           expect(result).toBeDefined();
@@ -76,10 +76,10 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
 
     describe.concurrent('search with optional parameters', () => {
       it(
-        'should execute search with objective only',
+        'should execute search with search_queries only',
         async () => {
           const result = await executeSearch(searchTool, {
-            objective: 'Current weather trends',
+            search_queries: ['current weather trends'],
           });
 
           expect(result).toBeDefined();
@@ -145,7 +145,7 @@ describe.skipIf(!process.env.PARALLEL_API_KEY)(
         'should create tool with custom defaults',
         async () => {
           const customSearchTool = createSearchTool({
-            mode: 'one-shot',
+            mode: 'basic',
             max_results: 3,
           });
 

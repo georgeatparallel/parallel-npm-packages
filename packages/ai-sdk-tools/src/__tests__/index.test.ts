@@ -85,6 +85,84 @@ describe('@parallel-web/ai-sdk-tools exports', () => {
     });
   });
 
+  describe('v1 search schema', () => {
+    it('searchTool inputSchema should require search_queries', async () => {
+      const { searchTool } = await import('../index.js');
+      const missing = searchTool.inputSchema.safeParse({
+        objective: 'find something',
+      });
+      expect(missing.success).toBe(false);
+
+      const empty = searchTool.inputSchema.safeParse({
+        search_queries: [],
+      });
+      expect(empty.success).toBe(false);
+    });
+
+    it('searchTool inputSchema should accept null for optional fields', async () => {
+      const { searchTool } = await import('../index.js');
+      const result = searchTool.inputSchema.safeParse({
+        search_queries: ['some query'],
+        objective: null,
+        mode: null,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('searchTool inputSchema should accept basic and advanced modes', async () => {
+      const { searchTool } = await import('../index.js');
+      for (const mode of ['basic', 'advanced'] as const) {
+        const result = searchTool.inputSchema.safeParse({
+          search_queries: ['some query'],
+          mode,
+        });
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it('searchTool inputSchema should default mode to advanced', async () => {
+      const { searchTool } = await import('../index.js');
+      const result = searchTool.inputSchema.safeParse({
+        search_queries: ['some query'],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mode).toBe('advanced');
+      }
+    });
+
+    it('createSearchTool inputSchema should accept null objective', async () => {
+      const { createSearchTool } = await import('../index.js');
+      const customTool = createSearchTool();
+      const result = customTool.inputSchema.safeParse({
+        search_queries: ['some query'],
+        objective: null,
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('v1 extract schema', () => {
+    it('extractTool inputSchema should accept null objective', async () => {
+      const { extractTool } = await import('../index.js');
+      const result = extractTool.inputSchema.safeParse({
+        urls: ['https://example.com'],
+        objective: null,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('createExtractTool inputSchema should accept null objective', async () => {
+      const { createExtractTool } = await import('../index.js');
+      const customTool = createExtractTool();
+      const result = customTool.inputSchema.safeParse({
+        urls: ['https://example.com'],
+        objective: null,
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('tool descriptions', () => {
     it('searchTool should have web search description', async () => {
       const { searchTool } = await import('../index.js');

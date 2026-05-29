@@ -36,8 +36,8 @@ importers:
   packages/ai-sdk-tools:
     dependencies:
       parallel-web:
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.5.0
+        version: 0.5.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -1984,9 +1984,6 @@ packages:
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
-
-  parallel-web@0.3.1:
-    resolution: {integrity: sha512-1yLiqdjFFhwgZUV2qOLTvu36A3wiCld8/Y8Zu1FsGk6y4ov4cZPhXNGafjDkM68aFc1c5KVB9ZYpkJZZ/mZW/w==}
 
   parallel-web@0.5.0:
     resolution: {integrity: sha512-p3JR9ENwbXtQJFTn4rWrraYKzHISkG2lwoRmVQceEqepgMtpuE6v/BEMi4yAmGum6ejK2F4DDKLkcqeFxnqztg==}
@@ -4755,8 +4752,6 @@ snapshots:
       netmask: 2.1.1
 
   package-json-from-dist@1.0.1: {}
-
-  parallel-web@0.3.1: {}
 
   parallel-web@0.5.0: {}
 
