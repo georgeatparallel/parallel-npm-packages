@@ -6,6 +6,8 @@ Monorepo for @parallel-web npm packages.
 
 - [`@parallel-web/ai-sdk-tools`](./packages/ai-sdk-tools) - AI SDK tools for Parallel Web
 - [`@parallel-web/opencode-plugin`](./packages/opencode-plugin) - Opencode plugin for Parallel Web
+- [`@parallel-web/pi-extension`](./packages/pi-extension) - pi agent extension for Parallel Web
+- `@parallel-web/oauth` - Internal, unpublished shared PKCE OAuth helper. Bundled into the opencode plugin and pi extension at build time (`noExternal`), so it is never installed by consumers and is intentionally marked `private`.
 
 ## Development
 
