@@ -119,7 +119,7 @@ await section('4. End-to-end via LLM (generateText)', async () => {
 
   const res = await generateText({
     model,
-    prompt: 'When was Vercel Ship AI?',
+    prompt: 'What is the latest news in france as of today?',
     tools: {
       webSearch: searchTool,
       webExtract: extractTool,
