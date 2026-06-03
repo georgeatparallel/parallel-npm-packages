@@ -14,7 +14,7 @@
  *   or paste an API key.
  */
 
-import type { Plugin } from '@opencode-ai/plugin';
+import type { Plugin, PluginModule } from '@opencode-ai/plugin';
 import { loginWithParallel } from '@parallel-web/oauth';
 import { createParallelSearchTool } from './tools/parallel-search.js';
 import { createParallelFetchTool } from './tools/parallel-fetch.js';
@@ -120,4 +120,8 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
   };
 };
 
-export default ParallelWebPlugin;
+// v1 plugin module shape (opencode >= 1.3.4). The named `ParallelWebPlugin`
+// export above remains for older opencode versions' legacy fallback loader.
+export default {
+  server: ParallelWebPlugin,
+} satisfies PluginModule;
