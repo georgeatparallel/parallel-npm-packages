@@ -33,10 +33,11 @@ vi.mock('@opencode-ai/plugin', () => {
 
 describe('@parallel-web/opencode-plugin exports', () => {
   describe('default export', () => {
-    it('should export ParallelWebPlugin as default', async () => {
+    it('should export a v1 PluginModule as default', async () => {
       const module = await import('../index.js');
       expect(module.default).toBeDefined();
-      expect(typeof module.default).toBe('function');
+      expect(typeof module.default).toBe('object');
+      expect(typeof module.default.server).toBe('function');
     });
 
     it('should export ParallelWebPlugin as named export', async () => {
@@ -45,9 +46,9 @@ describe('@parallel-web/opencode-plugin exports', () => {
       expect(typeof ParallelWebPlugin).toBe('function');
     });
 
-    it('default export should be the same as ParallelWebPlugin', async () => {
+    it('default export server should be the same as ParallelWebPlugin', async () => {
       const module = await import('../index.js');
-      expect(module.default).toBe(module.ParallelWebPlugin);
+      expect(module.default.server).toBe(module.ParallelWebPlugin);
     });
   });
 
