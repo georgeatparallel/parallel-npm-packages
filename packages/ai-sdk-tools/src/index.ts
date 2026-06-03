@@ -1,9 +1,9 @@
 /**
  * @parallel-web/ai-sdk-tools
  *
- * AI SDK tools for Parallel Web (AI SDK v5)
+ * AI SDK tools for Parallel Web (AI SDK v6)
  *
- * For AI SDK v4 compatibility, see the README for implementation examples.
+ * For AI SDK v5 support, use a previous version of this package (see the README).
  */
 
 // Default tools (MCP-like API)

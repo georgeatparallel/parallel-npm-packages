@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { extractTool, createExtractTool } from '../index.js';
-import type { ExtractResponse } from 'parallel-web/resources/beta/beta.mjs';
+import type { ExtractResponse } from 'parallel-web/resources/top-level.mjs';
 
 // Helper to execute tools in tests with proper typing
 async function executeExtract(
