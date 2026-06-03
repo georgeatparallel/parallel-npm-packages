@@ -123,5 +123,8 @@ export const ParallelWebPlugin: Plugin = async (_ctx) => {
 // v1 plugin module shape (opencode >= 1.3.4). The named `ParallelWebPlugin`
 // export above remains for older opencode versions' legacy fallback loader.
 export default {
+  // Required when loaded as a file-based plugin (plugins/ dir); npm installs
+  // would otherwise fall back to the package name.
+  id: 'parallel-web',
   server: ParallelWebPlugin,
 } satisfies PluginModule;
