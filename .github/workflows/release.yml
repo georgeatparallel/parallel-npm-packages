@@ -1,0 +1,208 @@
+name: Release
+
+# When a version-bump commit lands on main (from a merged release PR opened by
+# scripts/release.sh), publish any package whose version changed and that does
+# not yet have a tag. Each package is versioned and tagged independently — git
+# tags are namespaced per package (<package>-vX.Y.Z) so the three packages
+# never collide.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/*/package.json'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package directory under packages/ to (re)publish at its current version'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Detect packages to release
+    runs-on: ubuntu-latest
+    outputs:
+      any: ${{ steps.detect.outputs.any }}
+      matrix: ${{ steps.detect.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need history + tags to diff and to check existing tags
+
+      - name: Detect changed, unreleased package versions
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Build the candidate list of package.json paths to consider.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            CANDIDATES="packages/${INPUT_PACKAGE}/package.json"
+            if [ ! -f "$CANDIDATES" ]; then
+              echo "::error::no package found at $CANDIDATES"
+              exit 1
+            fi
+          else
+            BASE="$BEFORE"
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              BASE="$(git rev-parse "$SHA^" 2>/dev/null || echo '')"
+            fi
+            if [ -n "$BASE" ]; then
+              CANDIDATES="$(git diff --name-only "$BASE" "$SHA" -- 'packages/*/package.json')"
+            else
+              CANDIDATES="$(git ls-files 'packages/*/package.json')"
+            fi
+          fi
+
+          echo "Candidate package.json files:"
+          echo "${CANDIDATES:-<none>}"
+
+          INCLUDES="[]"
+          for pkg_json in $CANDIDATES; do
+            [ -f "$pkg_json" ] || continue
+            name="$(basename "$(dirname "$pkg_json")")"
+            private="$(node -p "require('./$pkg_json').private === true")"
+            if [ "$private" = "true" ]; then
+              echo "skip $name: private package"
+              continue
+            fi
+            version="$(node -p "require('./$pkg_json').version")"
+            tag="${name}-v${version}"
+            if git show-ref --quiet --verify "refs/tags/$tag"; then
+              echo "skip $name: tag $tag already exists (already released)"
+              continue
+            fi
+            case "$version" in
+              *-rc.*) npm_tag="rc"; prerelease="true" ;;
+              *)      npm_tag="latest"; prerelease="false" ;;
+            esac
+            echo "release $name@$version -> tag $tag (dist-tag $npm_tag)"
+            INCLUDES="$(node -e "
+              const arr = JSON.parse(process.argv[1]);
+              arr.push({
+                name: process.argv[2],
+                dir: 'packages/' + process.argv[2],
+                version: process.argv[3],
+                tag: process.argv[4],
+                npm_tag: process.argv[5],
+                prerelease: process.argv[6] === 'true',
+              });
+              console.log(JSON.stringify(arr));
+            " "$INCLUDES" "$name" "$version" "$tag" "$npm_tag" "$prerelease")"
+          done
+
+          COUNT="$(node -p "JSON.parse(process.argv[1]).length" "$INCLUDES")"
+          if [ "$COUNT" = "0" ]; then
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "Nothing to release."
+          else
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            echo "matrix={\"include\":$INCLUDES}" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Publish ${{ matrix.name }}@${{ matrix.version }}
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create tags + GitHub Releases
+      id-token: write # OIDC trusted publishing to npm
+    strategy:
+      fail-fast: false
+      max-parallel: 1 # serialize tag/release creation against the shared repo
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm
+        # Trusted publishing (OIDC) requires npm >= 11.5.1, newer than the
+        # version bundled with Node 20. Without this, publish fails with a
+        # misleading 404 on the PUT to the registry.
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm eslint ${{ matrix.dir }}
+
+      - name: Format check
+        run: pnpm prettier --check ${{ matrix.dir }}
+
+      - name: Type check
+        working-directory: ${{ matrix.dir }}
+        run: pnpm typecheck
+
+      - name: Test
+        working-directory: ${{ matrix.dir }}
+        run: pnpm test
+        env:
+          PARALLEL_API_KEY: ${{ secrets.PARALLEL_API_KEY }}
+
+      - name: Build
+        working-directory: ${{ matrix.dir }}
+        run: pnpm build
+
+      - name: Publish to npm
+        working-directory: ${{ matrix.dir }}
+        run: npm publish --access public --tag ${{ matrix.npm_tag }}
+
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ matrix.tag }}
+          NAME: ${{ matrix.name }}
+          VERSION: ${{ matrix.version }}
+          PRERELEASE: ${{ matrix.prerelease }}
+        run: |
+          set -euo pipefail
+
+          # Span release notes from the previous tag for THIS package so the
+          # changelog only reflects changes relevant to it.
+          PREV_TAG="$(git tag --list "${NAME}-v*" --sort=-v:refname | head -n1 || true)"
+          NOTES_FLAGS="--generate-notes"
+          if [ -n "$PREV_TAG" ]; then
+            NOTES_FLAGS="$NOTES_FLAGS --notes-start-tag $PREV_TAG"
+          fi
+          PRERELEASE_FLAG=""
+          if [ "$PRERELEASE" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "$TAG" \
+            --target "${{ github.sha }}" \
+            --title "@parallel-web/${NAME}@${VERSION}" \
+            $NOTES_FLAGS \
+            $PRERELEASE_FLAG
+
+      - name: Summary
+        run: |
+          echo "✅ Published @parallel-web/${{ matrix.name }}@${{ matrix.version }} (dist-tag: ${{ matrix.npm_tag }})"
+          echo "Tag: ${{ matrix.tag }}"

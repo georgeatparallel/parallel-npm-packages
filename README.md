@@ -75,90 +75,32 @@ pnpm --filter @parallel-web/ai-sdk-tools test
 
 ## Publishing
 
-Packages are published to npm using automated GitHub Actions workflows.
-
-### Canary Releases
-
-Every push to `main` can be published to a canary release with version format `x.y.z-canary.{shortSHA}`.
-
-- Published with the `canary` npm dist-tag
-- Does not modify `package.json` in git
-- Includes full CI validation before publishing
-
-**Install canary version:**
+Each package is versioned, tagged, and released **independently**. Releases are PR-driven:
+a local script opens a version-bump PR, and merging it publishes to npm. See
+[`PUBLISHING.md`](./PUBLISHING.md) for the full guide.
 
 ```bash
-npm install @parallel-web/ai-sdk-tools@canary
+git checkout main && git pull
+
+# Release candidate (1.2.0 -> 1.3.0-rc.1, or bump an existing rc)
+./scripts/release.sh ai-sdk-tools rc
+
+# Promote the current RC to stable (1.3.0-rc.2 -> 1.3.0)
+./scripts/release.sh ai-sdk-tools stable
+
+# Explicit version
+./scripts/release.sh opencode-plugin 2.0.0
 ```
 
-### Stable Releases (Manual)
+The script bumps the version, opens a `release/<package>-vX.Y.Z` PR, and on merge the
+**Release** workflow (`.github/workflows/release.yml`) builds/tests the package, publishes to
+npm, and creates the per-package git tag `<package>-vX.Y.Z` plus a GitHub Release.
 
-Stable releases are triggered manually via GitHub Actions:
-
-1. Go to **Actions** → **Publish Stable Release** → **Run workflow**
-2. Select version bump type:
-   - `patch`: Bug fixes (1.2.3 → 1.2.4)
-   - `minor`: New features (1.2.3 → 1.3.0)
-   - `major`: Breaking changes (1.2.3 → 2.0.0)
-3. Workflow will:
-   - Run full test suite
-   - Bump version in `package.json`
-   - Generate changelog from conventional commits
-   - Create git tag and commit
-   - Publish to npm with `latest` tag
-   - Create GitHub release
-
-**Install stable version:**
-
-```bash
-npm install @parallel-web/ai-sdk-tools
-```
-
-### Manual Publishing (Local)
-
-If the CI publish workflow fails partway through (e.g., the git tag was pushed but `npm publish` failed), the workflow isn't idempotent and can't simply be re-run. Use these steps to finish the publish locally.
-
-**1. Authenticate with npm:**
-
-```bash
-# Either log in interactively:
-npm login
-
-# verify with
-npm whoami
-```
-
-**4. Publish:**
-
-```bash
-cd packages/<package-name>
-
-# Dry-run first to verify tarball contents
-npm publish --dry-run --tag latest --access public
-
-# Publish for real
-npm publish --tag latest --access public
-```
-
-### Conventional Commits
-
-For proper changelog generation, follow conventional commit format:
-
-- `feat: add new feature` → triggers minor version bump
-- `fix: resolve bug` → triggers patch version bump
-- `feat!: breaking change` or `BREAKING CHANGE:` → triggers major version bump
-
-### Setup (Maintainers Only)
-
-Required GitHub repository secret:
-
-- **Name**: `NPM_PARALLEL_DEVELOPERS_PASSWORD`
-- **Value**: npm automation token from `developers@parallel.ai` account
-- **How to create**:
-  1. Log into npmjs.com with `developers@parallel.ai`
-  2. Go to Account Settings → Access Tokens
-  3. Generate New Token → Select **Automation** type
-  4. Copy token and add to GitHub repository secrets
+- **RC support**: `x.y.z-rc.N` versions publish under the `rc` npm dist-tag; stable versions
+  under `latest`. So `npm install @parallel-web/<package>` gets the latest stable, and
+  `@rc` opts into pre-releases.
+- **Per-package tags**: tags are namespaced per package and never collide.
+- **Trusted publishing**: uses npm OIDC trusted publishing — no npm token is stored in the repo.
 
 ## License
 
