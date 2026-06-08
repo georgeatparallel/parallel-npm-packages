@@ -1,443 +1,119 @@
 # Publishing Guide
 
-This document provides detailed information about the npm publishing workflows and how to test them.
+This monorepo publishes three npm packages, each versioned, tagged, and released **independently**:
 
-## Overview
+- `@parallel-web/ai-sdk-tools` — `packages/ai-sdk-tools`
+- `@parallel-web/opencode-plugin` — `packages/opencode-plugin`
+- `@parallel-web/pi-extension` — `packages/pi-extension`
 
-This repository uses package-specific workflows for publishing to npm. Each package has its own dedicated workflows:
+(`@parallel-web/oauth` in `packages/parallel-oauth` is `private` — it is bundled into the
+packages above at build time and is never published.)
 
-1. **Canary Publishing**: Manually triggered to publish pre-release versions
-2. **Stable Publishing**: Manually triggered to publish stable releases
+## How releases work
 
-**Current packages:**
-- `@parallel-web/ai-sdk-tools` - AI SDK tools for Parallel Web
-- `@parallel-web/opencode-plugin` - Opencode plugin for Parallel Web
-- `@parallel-web/pi-extension` - Pi extension for Parallel Web
+Releases are **PR-driven** and fully automated on merge — there is no manual "Run workflow"
+button to click.
 
-**Note**: This monorepo is designed to support multiple packages. When adding new packages, create dedicated workflows following the naming pattern: `publish-{package-name}-canary.yml` and `publish-{package-name}-stable.yml`.
+1. You run `./scripts/release.sh <package> <rc|stable|X.Y.Z>` locally. It bumps the version
+   in that package's `package.json`, creates a `release/<package>-vX.Y.Z` branch, commits with
+   message `chore(<package>): bump version to X.Y.Z`, pushes, and opens a PR.
+2. You review and merge the PR.
+3. `.github/workflows/release.yml` runs on the push to `main`. It detects which
+   `packages/*/package.json` changed, and for each whose `<package>-vX.Y.Z` git tag does not
+   yet exist, it builds + lints + type-checks + tests that package, publishes it to npm, creates
+   the git tag `<package>-vX.Y.Z`, and cuts a GitHub Release.
 
-## Workflow Architecture
+### Per-package git tags
 
-### Canary Workflow (`.github/workflows/publish-ai-sdk-tools-canary.yml`)
+Tags are namespaced per package (e.g. `ai-sdk-tools-v1.1.0`, `opencode-plugin-v1.3.0`). They are
+**not** tied to npm dist-tags and never collide across packages — each package has its own
+independent version line. (The legacy shared `vX.Y.Z` tags are obsolete and unused.)
 
-**Package**: `@parallel-web/ai-sdk-tools`
+### RC support / npm dist-tags
 
-**Trigger**: Manual via GitHub Actions UI
+Pre-releases publish under the `rc` npm dist-tag; stable releases publish under `latest`. The
+version string drives this automatically:
 
-**Process**:
-1. Runs package-specific CI suite:
-   - Lints `packages/ai-sdk-tools`
-   - Format checks `packages/ai-sdk-tools`
-   - Type checks `packages/ai-sdk-tools`
-   - Runs tests for `packages/ai-sdk-tools`
-   - Builds `packages/ai-sdk-tools`
-2. Calculates canary version by:
-   - Reading current version from `packages/ai-sdk-tools/package.json` (e.g., `1.2.3`)
-   - Bumping patch version (e.g., `1.2.4`)
-   - Appending `-canary.{shortSHA}` (e.g., `1.2.4-canary.abc1234`)
-3. Publishes to npm with `--tag canary`
-4. Does NOT commit changes to git
+- `1.2.0-rc.1` → published with `--tag rc`, GitHub Release marked as pre-release.
+- `1.2.0` → published with `--tag latest`.
 
-**Result**: Package available as `@parallel-web/ai-sdk-tools@canary`
+So `npm install @parallel-web/<package>` always resolves to the latest **stable** release;
+`npm install @parallel-web/<package>@rc` opts into the latest pre-release.
 
-### Stable Workflow (`.github/workflows/publish-ai-sdk-tools-stable.yml`)
+### Trusted publishing (OIDC)
 
-**Package**: `@parallel-web/ai-sdk-tools`
+Publishing uses npm [trusted publishing](https://docs.npmjs.com/trusted-publishers) via GitHub
+OIDC — **no npm token is stored in the repo**. The workflow upgrades npm to the latest version
+first, because trusted publishing requires npm ≥ 11.5.1 (newer than what Node 20 bundles).
+Skipping that upgrade causes a misleading `404 Not Found` on the publish `PUT`.
 
-**Trigger**: Manual via GitHub Actions UI
+## Cutting a release
 
-**Prerequisites**:
-1. Version must be manually bumped in `packages/ai-sdk-tools/package.json` via a PR
-2. PR must be merged to `main` before triggering the workflow
-
-**Process**:
-1. Runs package-specific CI suite:
-   - Lints `packages/ai-sdk-tools`
-   - Format checks `packages/ai-sdk-tools`
-   - Type checks `packages/ai-sdk-tools`
-   - Runs tests for `packages/ai-sdk-tools`
-   - Builds `packages/ai-sdk-tools`
-2. Reads current version from `packages/ai-sdk-tools/package.json`
-3. Verifies that version tag doesn't already exist
-4. Generates changelog from conventional commits since last tag
-5. Creates git tag: `v{version}`
-6. Pushes tag to repository (no commits to `main`)
-7. Publishes to npm with `--tag latest`
-8. Creates GitHub Release with changelog
-
-**Result**: New stable version published and tagged in git (no version bump commits)
-
-## How to Create a Stable Release
-
-Follow these steps to publish a new stable version:
-
-### Step 1: Create a Release PR
-
-1. Create a new branch from `main`:
-   ```bash
-   git checkout main
-   git pull origin main
-   git checkout -b release/v0.2.0  # Use the new version number
-   ```
-
-2. Bump the version in `packages/ai-sdk-tools/package.json`:
-   ```bash
-   cd packages/ai-sdk-tools
-   npm version patch  # or 'minor' or 'major'
-   # This updates package.json and pnpm-lock.yaml
-   ```
-   
-   Or manually edit `package.json` to set the desired version.
-
-3. Commit the version bump:
-   ```bash
-   git add .
-   git commit -m "chore: bump version to v0.2.0"
-   ```
-
-4. Push the branch and create a PR:
-   ```bash
-   git push origin release/v0.2.0
-   ```
-
-5. Create a PR with title: `chore: release v0.2.0`
-
-6. Wait for CI to pass and get the PR reviewed/approved
-
-7. Merge the PR to `main`
-
-### Step 2: Trigger the Publish Workflow
-
-1. Go to the [Actions tab](https://github.com/shapleyai/parallel-web-npm-packages/actions)
-
-2. Select "Publish ai-sdk-tools Stable" workflow
-
-3. Click "Run workflow"
-
-4. Select `main` branch
-
-5. Check the confirmation checkbox
-
-6. Click "Run workflow"
-
-### Step 3: Verify the Release
-
-The workflow will:
-- Run all tests and checks
-- Create a git tag (e.g., `v0.2.0`)
-- Publish to npm as `@parallel-web/ai-sdk-tools@0.2.0`
-- Create a GitHub Release with auto-generated changelog
-
-Verify the release:
-```bash
-# Check npm
-npm view @parallel-web/ai-sdk-tools version
-
-# Check git tags
-git fetch --tags
-git tag -l
-
-# Check GitHub Releases
-# Visit: https://github.com/shapleyai/parallel-web-npm-packages/releases
-```
-
-## Testing the Workflows
-
-### Prerequisites
-
-1. **Set up npm token** (see Setup section below)
-2. **Enable GitHub Actions** in repository settings
-3. **Protect main branch** (recommended but not required for testing)
-
-### Testing Canary Publishing
-
-#### Option 1: Test on a Feature Branch (Recommended for Initial Testing)
-
-Modify the workflow temporarily to test without affecting main:
-
-```yaml
-# In .github/workflows/publish-ai-sdk-tools-canary.yml
-on:
-  push:
-    branches: [main, test-canary]  # Add test branch
-```
-
-Then:
-```bash
-git checkout -b test-canary
-git push origin test-canary
-```
-
-Watch the workflow run in Actions tab.
-
-#### Option 2: Dry Run Test
-
-Add a dry-run step before actual publishing:
-
-```yaml
-- name: Dry run publish
-  run: |
-    cd packages/ai-sdk-tools
-    npm publish --dry-run --tag canary
-```
-
-This shows what would be published without actually publishing.
-
-#### Option 3: Test on Real Main Branch
-
-If you're confident:
-1. Make any commit to main
-2. Push to GitHub
-3. Watch Actions tab for "Publish ai-sdk-tools Canary" workflow
-4. Check npm registry: `npm view @parallel-web/ai-sdk-tools@canary`
-
-### Testing Stable Publishing
-
-#### Option 1: Dry Run on a Test Branch
-
-Test the entire workflow without affecting main:
-
-1. Create a test branch:
-```bash
-git checkout -b test-release
-```
-
-2. Bump version to a test version:
-```bash
-cd packages/ai-sdk-tools
-npm version 0.0.0-test.1 --no-git-tag-version
-git add package.json
-git commit -m "test: version bump"
-git push origin test-release
-```
-
-3. Temporarily modify `.github/workflows/publish-ai-sdk-tools-stable.yml` to:
-   - Trigger on push to `test-release` branch
-   - Add `--dry-run` flag to npm publish step
-
-4. Push and observe the workflow run
-
-#### Option 2: Manual Local Testing
-
-Test the release process locally before running in CI:
+From a clean `main`:
 
 ```bash
-# Simulate the workflow steps
-pnpm install --frozen-lockfile
-pnpm lint
-pnpm format:check
-pnpm typecheck
-pnpm test:ci
-pnpm build
+git checkout main && git pull
 
-# Test version reading
-cd packages/ai-sdk-tools
-VERSION=$(node -p "require('./package.json').version")
-echo "Version: $VERSION"
+# Release candidate (1.2.0 -> 1.3.0-rc.1, or 1.3.0-rc.1 -> 1.3.0-rc.2)
+./scripts/release.sh ai-sdk-tools rc
 
-# Test tag creation (don't push)
-git tag -a "v${VERSION}-test" -m "Test release"
-git tag -d "v${VERSION}-test"  # Clean up
+# Promote the current RC to stable (1.3.0-rc.2 -> 1.3.0)
+./scripts/release.sh ai-sdk-tools stable
 
-# Test npm publish (dry run)
-npm publish --dry-run --tag latest --access public
+# Set an explicit version
+./scripts/release.sh opencode-plugin 2.0.0
+./scripts/release.sh pi-extension 2.0.0-rc.1
 ```
 
-#### Option 3: Test on a Fork
+The script refuses to run on a dirty tree, off `main`, or if the target tag already exists. It
+prints the computed version and asks for confirmation before pushing. Merge the resulting PR to
+trigger the publish.
 
-1. Fork the repository
-2. Set up the npm token in fork secrets
-3. Run the workflow on the fork
-4. Verify it works before applying to main repository
+## Verifying a release
 
-### Validation Checklist
+```bash
+# npm
+npm view @parallel-web/ai-sdk-tools version          # latest stable
+npm view @parallel-web/ai-sdk-tools dist-tags         # latest + rc
 
-Before publishing a stable release:
+# git tags / GitHub Releases
+git fetch --tags && git tag -l 'ai-sdk-tools-v*'
+```
 
-- [ ] Version bumped in `packages/ai-sdk-tools/package.json`
-- [ ] Version follows semantic versioning (e.g., `0.2.0`)
-- [ ] Version doesn't already have a git tag
-- [ ] Release PR merged to `main`
-- [ ] All tests pass locally: `pnpm test:ci`
-- [ ] Build succeeds: `pnpm build`
-- [ ] npm token is set correctly in GitHub secrets (`NPM_PARALLEL_DEVELOPERS_PASSWORD`)
-- [ ] Token has correct permissions (publish access to `@parallel-web/ai-sdk-tools`)
+## Re-publishing / manual trigger
 
-## Setup Instructions
+If a publish step failed after the version was already merged (so the tag was never created), use
+the workflow's `workflow_dispatch` input to re-run it for a single package at its current
+`package.json` version:
 
-### 1. Create npm Automation Token
+- Actions → **Release** → **Run workflow** → enter the package directory name (e.g.
+  `opencode-plugin`).
 
-1. Log into [npmjs.com](https://npmjs.com) with `developers@parallel.ai`
-2. Navigate to: **Account Settings** → **Access Tokens**
-3. Click **Generate New Token**
-4. Select **Automation** type (recommended for CI/CD)
-5. Give it a descriptive name: `GitHub Actions - parallel-web-npm-packages`
-6. Copy the token (starts with `npm_...`)
-
-### 2. Add Token to GitHub
-
-1. Go to repository **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `NPM_PARALLEL_DEVELOPERS_PASSWORD`
-4. Value: Paste the npm token
-5. Click **Add secret**
-
-### 3. Verify Token Permissions
-
-The token must have:
-- **Publish** access to `@parallel-web/ai-sdk-tools`
-- **Read** access to package metadata
-
-You can verify this by checking the npm organization settings.
+If the tag already exists the run is a no-op (the package is considered already released); bump
+to a new version with `scripts/release.sh` instead.
 
 ## Troubleshooting
 
-### Canary publish fails with "version already exists"
+### `404 Not Found` on `npm publish`
 
-**Cause**: The git SHA creates a unique version, so this is rare. May happen if workflow runs twice for the same commit.
+Trusted publishing requires npm ≥ 11.5.1. The workflow runs `npm install -g npm@latest` to
+satisfy this; if you see this error, confirm that step ran and that the package's trusted
+publisher is configured on npmjs.com for this repo + the `Release` workflow.
 
-**Solution**: Re-run the workflow or push a new commit.
+### `tag <package>-vX.Y.Z already exists`
 
-### Stable publish fails with "permission denied"
-
-**Cause**: npm token doesn't have publish permissions.
-
-**Solution**: 
-1. Verify token in npm settings
-2. Check organization membership for `developers@parallel.ai`
-3. Regenerate token if needed
-
-### Tag already exists error
-
-**Cause**: The version in `package.json` already has a corresponding git tag.
-
-**Solution**: 
-1. Check existing tags: `git tag -l`
-2. Bump the version in `package.json` to a new version
-3. Create a new release PR with the updated version
-4. Merge and re-run the workflow
-
-### Changelog is empty
-
-**Cause**: No conventional commits found between versions.
-
-**Solution**: Ensure commits follow format:
-- `feat: description`
-- `fix: description`
-- `chore: description`
+That version was already released. Bump to a new version with `scripts/release.sh`.
 
 ### Tests fail during publish
 
-**Cause**: Code has issues or environment variables missing.
+Set the `PARALLEL_API_KEY` repository secret (used by `ai-sdk-tools` / `opencode-plugin` tests),
+and run the package's tests locally first: `cd packages/<package> && pnpm test`.
 
-**Solution**:
-1. Ensure `PARALLEL_API_KEY` secret is set (for tests)
-2. Run tests locally first: `pnpm test:ci`
-3. Check workflow logs for specific error
+## Rolling back
 
-## npm Dist-Tags
-
-The package uses npm dist-tags to manage different release channels:
-
-- **`latest`**: Stable releases (default when running `npm install`)
-- **`canary`**: Pre-release builds (requires explicit `@canary` to install)
-
-View all tags:
-```bash
-npm dist-tag ls @parallel-web/ai-sdk-tools
-```
-
-Output example:
-```
-canary: 1.2.4-canary.abc1234
-latest: 1.2.3
-```
-
-## Monitoring Releases
-
-### Check Published Versions
+npm unpublish is discouraged. Prefer publishing a patch, or move the `latest` dist-tag:
 
 ```bash
-# View all versions
-npm view @parallel-web/ai-sdk-tools versions
-
-# View latest stable
-npm view @parallel-web/ai-sdk-tools version
-
-# View canary
-npm view @parallel-web/ai-sdk-tools dist-tags
+npm dist-tag add @parallel-web/ai-sdk-tools@1.2.3 latest   # roll latest back to a known-good version
+npm deprecate @parallel-web/ai-sdk-tools@1.2.4 "Use 1.2.5 instead"
 ```
-
-### Verify Package Contents
-
-```bash
-# Download and inspect without installing
-npm pack @parallel-web/ai-sdk-tools@canary
-tar -tzf parallel-web-ai-sdk-tools-*.tgz
-```
-
-### GitHub Actions Logs
-
-Monitor workflows at:
-```
-https://github.com/parallel-web/npm-packages/actions
-```
-
-## Best Practices
-
-1. **Always use conventional commits** for automatic changelog generation
-2. **Create release PRs** to bump versions - never commit directly to main
-3. **Test canary versions** before promoting to stable
-4. **Review changelog preview** in workflow logs before GitHub Release creation
-5. **Use patch** for backwards-compatible bug fixes (0.1.0 → 0.1.1)
-6. **Use minor** for new features that are backwards-compatible (0.1.0 → 0.2.0)
-7. **Use major** for breaking changes (0.1.0 → 1.0.0)
-8. **Keep main branch stable** - all tests should pass before merging
-9. **Tag naming convention** - all tags should be prefixed with `v` (e.g., `v0.2.0`)
-10. **Monitor npm download stats** to understand usage patterns
-
-## Security Considerations
-
-- ✅ npm token stored as GitHub secret (encrypted)
-- ✅ Token uses "Automation" type (no 2FA required in CI)
-- ✅ Workflows run with minimal permissions
-- ✅ No token exposure in logs
-- ✅ Full CI validation before every publish
-- ✅ Git tags provide immutable release history
-- ✅ Conventional commits provide audit trail
-- ✅ Version changes require PR review (respects branch protection)
-- ✅ No automated commits to main branch (tag-only workflow)
-
-## Emergency Procedures
-
-### Unpublish a Bad Release
-
-⚠️ **Use with extreme caution** - npm unpublish is discouraged
-
-```bash
-npm unpublish @parallel-web/ai-sdk-tools@1.2.4
-```
-
-**Better alternative**: Publish a patch version with fix
-
-### Deprecate a Version
-
-```bash
-npm deprecate @parallel-web/ai-sdk-tools@1.2.4 "Critical bug, use 1.2.5 instead"
-```
-
-### Roll Back to Previous Version
-
-Move the `latest` tag to a previous version:
-
-```bash
-npm dist-tag add @parallel-web/ai-sdk-tools@1.2.3 latest
-```
-
-## Support
-
-For issues with publishing:
-1. Check workflow logs in GitHub Actions
-2. Verify npm token permissions
-3. Review this guide's troubleshooting section
-4. Contact repository maintainers
