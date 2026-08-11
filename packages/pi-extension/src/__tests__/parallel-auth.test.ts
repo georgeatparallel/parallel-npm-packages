@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from '@earendil-works/pi-coding-agent';
 import type { Provider } from '@earendil-works/pi-ai';
 
 const mocks = vi.hoisted(() => ({
@@ -37,9 +40,9 @@ function createInteraction(
   } as never;
 }
 
-let registerParallelAuthProvider: typeof import('../parallel-auth.js')['registerParallelAuthProvider'];
-let getParallelApiKey: typeof import('../parallel-auth.js')['getParallelApiKey'];
-let getParallelAuthStatus: typeof import('../parallel-auth.js')['getParallelAuthStatus'];
+let registerParallelAuthProvider: (typeof import('../parallel-auth.js'))['registerParallelAuthProvider'];
+let getParallelApiKey: (typeof import('../parallel-auth.js'))['getParallelApiKey'];
+let getParallelAuthStatus: (typeof import('../parallel-auth.js'))['getParallelAuthStatus'];
 let PARALLEL_PROVIDER: string;
 
 describe('parallel-auth', () => {
@@ -121,9 +124,10 @@ describe('parallel-auth', () => {
     const provider = registerProvider();
     const interaction = createInteraction();
 
-    await expect(
-      provider.auth.apiKey?.login?.(interaction)
-    ).resolves.toEqual({ type: 'api_key', key: 'fresh-key' });
+    await expect(provider.auth.apiKey?.login?.(interaction)).resolves.toEqual({
+      type: 'api_key',
+      key: 'fresh-key',
+    });
 
     expect(interaction.notify).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -135,7 +139,9 @@ describe('parallel-auth', () => {
 
   it('prompts through Pi when the loopback callback times out', async () => {
     mocks.runParallelOAuth.mockImplementation(async (options) => {
-      const pasted = await options.promptForCallback('https://platform.parallel.ai/oauth');
+      const pasted = await options.promptForCallback(
+        'https://platform.parallel.ai/oauth'
+      );
       return { apiKey: `key-from-${pasted}` };
     });
 
@@ -155,7 +161,9 @@ describe('parallel-auth', () => {
 
   it('aborts the login when the user cancels the manual prompt', async () => {
     mocks.runParallelOAuth.mockImplementation(async (options) => {
-      const pasted = await options.promptForCallback('https://platform.parallel.ai/oauth');
+      const pasted = await options.promptForCallback(
+        'https://platform.parallel.ai/oauth'
+      );
       expect(pasted).toBeUndefined();
       throw new Error('Parallel login cancelled');
     });
