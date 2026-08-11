@@ -1,2 +1,12 @@
 packages:
   - 'packages/*'
+
+# pnpm >= 11 refuses to install unless every dependency lifecycle script is
+# explicitly allowed or denied. esbuild's postinstall fetches its platform
+# binary; nothing else here needs to run code at install time.
+allowBuilds:
+  '@google/genai': false
+  esbuild: true
+  koffi: false
+  msgpackr-extract: false
+  protobufjs: false

@@ -11,10 +11,12 @@ Monorepo for @parallel-web npm packages.
 
 ## Development
 
-This is a pnpm monorepo. Make sure you have pnpm installed:
+This is a pnpm monorepo requiring Node >= 22.13. The pnpm version is pinned by
+the `packageManager` field in `package.json`, so use corepack rather than a
+globally installed pnpm:
 
 ```bash
-npm install -g pnpm
+corepack enable
 ```
 
 ### Setup
@@ -24,6 +26,18 @@ Install dependencies:
 ```bash
 pnpm install
 ```
+
+#### With Nix (optional)
+
+A flake provides Node and a corepack-backed `pnpm` matching CI:
+
+```bash
+nix develop
+pnpm install
+```
+
+With [direnv](https://direnv.net), `echo "use flake" > .envrc && direnv allow`
+enters the shell automatically. `.envrc` is gitignored, so this stays per-developer.
 
 ### Commands
 
