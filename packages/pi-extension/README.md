@@ -11,13 +11,20 @@ pi install npm:@parallel-web/pi-extension
 
 - Registers `web_search`
 - Registers `web_fetch`
-- Adds a `parallel-login` command for browser auth
-- Stores the resulting Parallel API key in Pi's auth store
+- Registers a `parallel` auth provider, so Pi's own `/login parallel` runs the
+  Parallel browser OAuth flow and stores the API key in Pi's auth store
+  (`auth.json`) alongside every other provider credential
+- Adds a `parallel-login` command that reports current auth status
 
-Auth resolution order:
+Auth resolution order (owned by Pi, not the extension):
 
-1. Stored Pi auth for provider key `parallel`
+1. The credential Pi stored for provider `parallel`
 2. `PARALLEL_API_KEY`
+
+`/logout parallel` removes the stored credential, and
+`pi auth check --provider parallel` reports whether it is configured.
+
+Requires `@earendil-works/pi-coding-agent` 0.83.0 or newer.
 
 ## Dogfooding Locally
 
@@ -41,7 +48,8 @@ If the extension loads successfully, Pi will have:
 
 - the `web_search` tool
 - the `web_fetch` tool
-- the `parallel-login` command
+- `parallel` listed under `/login`
+- the `parallel-login` status command
 - per-session Parallel `session_id` reuse inside that Pi session
 
 ### Option 2: Symlink It Into Pi Extensions
@@ -82,10 +90,12 @@ pnpm --filter @parallel-web/pi-extension build
 Inside Pi, run:
 
 ```text
-/parallel-login
+/login parallel
 ```
 
-That opens the browser for Parallel OAuth. On success, the API key is stored in Pi auth under `parallel`.
+That opens the browser for Parallel OAuth. On success, Pi stores the API key in
+its auth store under `parallel`. Run `/parallel-login` to see the current status,
+and `/logout parallel` to remove the credential.
 
 ### Use Environment Variable Instead
 
@@ -105,7 +115,7 @@ export PARALLEL_PLATFORM_URL=https://your-platform-host
 pi --no-extensions --no-skills -e ./packages/pi-extension/dist/index.js
 ```
 
-This changes the browser login endpoints used by `parallel-login` and on-demand auth.
+This changes the browser login endpoints used by `/login parallel`.
 
 ## Quick Smoke Test
 
@@ -136,5 +146,7 @@ pnpm --filter @parallel-web/pi-extension typecheck
 - Search requests include `client_model` when Pi has an active model selected.
 - Search and extract requests reuse a generated `session_id` for the life of the current Pi session.
 - The login flow tries to open your browser automatically.
-- If automatic callback capture does not complete, the extension falls back to asking you to paste the callback URL.
+- If automatic callback capture does not complete, the login dialog asks you to paste the callback URL.
+- Credential storage is entirely Pi's; the extension only reads the resolved key
+  through `ctx.modelRegistry.getApiKeyForProvider("parallel")`.
 - Skill suppression inside the extension is prompt-level only. If you want a clean dogfooding session without your usual skills list, start Pi with `--no-skills`.

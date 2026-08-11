@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from '@mariozechner/pi-coding-agent';
+} from '@earendil-works/pi-coding-agent';
 
 const mocks = vi.hoisted(() => ({
   getParallelApiKey: vi.fn(),
-  loginWithParallel: vi.fn(),
-  clearStoredParallelApiKey: vi.fn(),
+  getParallelAuthStatus: vi.fn(),
+  registerParallelAuthProvider: vi.fn(),
   runParallelSearch: vi.fn(),
   runParallelExtract: vi.fn(),
   isParallelAuthenticationError: vi.fn(),
@@ -15,8 +15,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../parallel-auth.js', () => ({
   getParallelApiKey: mocks.getParallelApiKey,
-  loginWithParallel: mocks.loginWithParallel,
-  clearStoredParallelApiKey: mocks.clearStoredParallelApiKey,
+  getParallelAuthStatus: mocks.getParallelAuthStatus,
+  registerParallelAuthProvider: mocks.registerParallelAuthProvider,
 }));
 
 vi.mock('../parallel-client.js', () => ({
@@ -29,6 +29,7 @@ type MockPi = {
   on: ReturnType<typeof vi.fn>;
   registerCommand: ReturnType<typeof vi.fn>;
   registerTool: ReturnType<typeof vi.fn>;
+  registerProvider: ReturnType<typeof vi.fn>;
 };
 
 function createMockPi(): MockPi {
@@ -36,6 +37,7 @@ function createMockPi(): MockPi {
     on: vi.fn(),
     registerCommand: vi.fn(),
     registerTool: vi.fn(),
+    registerProvider: vi.fn(),
   };
 }
 
@@ -90,8 +92,7 @@ describe('@parallel-web/pi-extension', () => {
     expect(pi.registerCommand).toHaveBeenCalledWith(
       'parallel-login',
       expect.objectContaining({
-        description:
-          'Run Parallel browser login and store the API key in Pi auth',
+        description: 'Show Parallel authentication status and how to sign in',
         handler: expect.any(Function),
       })
     );
@@ -186,8 +187,18 @@ describe('@parallel-web/pi-extension', () => {
     expect(result.systemPrompt).toContain('<name>result</name>');
   });
 
-  it('parallel-login should run browser login and notify on success', async () => {
-    mocks.loginWithParallel.mockResolvedValue('stored-api-key');
+  it('should register the Parallel auth provider with Pi', async () => {
+    const extension = (await import('../index.js')).default;
+    const pi = createMockPi();
+
+    extension(pi as unknown as ExtensionAPI);
+
+    expect(mocks.registerParallelAuthProvider).toHaveBeenCalledWith(pi);
+  });
+
+  it('parallel-login should point at /login parallel when unauthenticated', async () => {
+    mocks.getParallelApiKey.mockResolvedValue(undefined);
+    mocks.getParallelAuthStatus.mockReturnValue({ configured: false });
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
@@ -198,9 +209,55 @@ describe('@parallel-web/pi-extension', () => {
 
     await command.handler([], ctx);
 
-    expect(mocks.loginWithParallel).toHaveBeenCalledWith(ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(
-      'Parallel login completed.',
+      expect.stringContaining('/login parallel'),
+      'info'
+    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining('not authenticated'),
+      'info'
+    );
+  });
+
+  it('parallel-login should report the credential source when authenticated', async () => {
+    mocks.getParallelApiKey.mockResolvedValue('stored-api-key');
+    mocks.getParallelAuthStatus.mockReturnValue({
+      configured: true,
+      source: 'stored',
+    });
+
+    const extension = (await import('../index.js')).default;
+    const pi = createMockPi();
+    extension(pi as unknown as ExtensionAPI);
+
+    const command = getRegisteredCommand(pi, 'parallel-login');
+    const ctx = createToolContext();
+
+    await command.handler([], ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining('authenticated (stored)'),
+      'info'
+    );
+  });
+
+  it('parallel-login should recognize a key that only PARALLEL_API_KEY provides', async () => {
+    // getProviderAuthStatus only sees stored credentials, so an env-var-only
+    // setup reports unconfigured even though the key resolves fine.
+    mocks.getParallelApiKey.mockResolvedValue('env-api-key');
+    mocks.getParallelAuthStatus.mockReturnValue({ configured: false });
+
+    const extension = (await import('../index.js')).default;
+    const pi = createMockPi();
+    extension(pi as unknown as ExtensionAPI);
+
+    const command = getRegisteredCommand(pi, 'parallel-login');
+    const ctx = createToolContext();
+
+    await command.handler([], ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining('authenticated (PARALLEL_API_KEY)'),
       'info'
     );
   });
@@ -242,88 +299,54 @@ describe('@parallel-web/pi-extension', () => {
     );
   });
 
-  it('web_search should prompt for auth, login, and retry when no credentials are present', async () => {
+  it('web_search should direct the user to /login parallel when no credentials are present', async () => {
     mocks.getParallelApiKey.mockResolvedValue(undefined);
-    mocks.loginWithParallel.mockResolvedValue('fresh-api-key');
-    mocks.runParallelSearch.mockResolvedValue({ ok: true });
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
     extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
-    const ctx = createToolContext({
-      hasUI: true,
-      ui: {
-        confirm: vi.fn().mockResolvedValue(true),
-        notify: vi.fn(),
-        input: vi.fn(),
-      },
-    });
 
-    const result = await searchTool.execute(
-      'tool-call-id',
-      { objective: 'Find docs', search_queries: ['parallel docs'] },
-      undefined,
-      undefined,
-      ctx
+    await expect(
+      searchTool.execute(
+        'tool-call-id',
+        { objective: 'Find docs', search_queries: ['parallel docs'] },
+        undefined,
+        undefined,
+        createToolContext({ hasUI: true })
+      )
+    ).rejects.toThrow(
+      'Parallel authentication required. Run `/login parallel` in Pi, or set PARALLEL_API_KEY.'
     );
 
-    expect(ctx.ui.confirm).toHaveBeenCalledWith(
-      'Parallel authentication required',
-      'This tool needs Parallel auth. Start browser login now?'
-    );
-    expect(mocks.loginWithParallel).toHaveBeenCalledWith(ctx);
-    expect(mocks.runParallelSearch).toHaveBeenCalledWith(
-      'fresh-api-key',
-      {
-        objective: 'Find docs',
-        search_queries: ['parallel docs'],
-        client_model: undefined,
-        session_id: expect.any(String),
-      },
-      undefined
-    );
-    expect(result.content[0].text).toBe(JSON.stringify({ ok: true }, null, 2));
+    expect(mocks.runParallelSearch).not.toHaveBeenCalled();
   });
 
-  it('web_search should reauthenticate and retry on auth failures when UI is available', async () => {
+  it('web_search should direct the user to re-login when the stored credential is rejected', async () => {
     mocks.getParallelApiKey.mockResolvedValue('stale-api-key');
     mocks.isParallelAuthenticationError.mockReturnValue(true);
-    mocks.runParallelSearch
-      .mockRejectedValueOnce(new Error('unauthorized'))
-      .mockResolvedValueOnce({ ok: true });
-    mocks.loginWithParallel.mockResolvedValue('fresh-api-key');
+    mocks.runParallelSearch.mockRejectedValue(new Error('unauthorized'));
 
     const extension = (await import('../index.js')).default;
     const pi = createMockPi();
     extension(pi as unknown as ExtensionAPI);
 
     const searchTool = getRegisteredTool(pi, 'web_search');
-    const ctx = createToolContext({
-      hasUI: true,
-      ui: {
-        confirm: vi.fn().mockResolvedValue(true),
-        notify: vi.fn(),
-        input: vi.fn(),
-      },
-    });
 
-    const result = await searchTool.execute(
-      'tool-call-id',
-      { objective: 'Find docs', search_queries: ['parallel docs'] },
-      undefined,
-      undefined,
-      ctx
+    await expect(
+      searchTool.execute(
+        'tool-call-id',
+        { objective: 'Find docs', search_queries: ['parallel docs'] },
+        undefined,
+        undefined,
+        createToolContext({ hasUI: true })
+      )
+    ).rejects.toThrow(
+      'Parallel rejected the stored credential. Run `/login parallel` in Pi to sign in again.'
     );
 
-    expect(mocks.clearStoredParallelApiKey).toHaveBeenCalledWith(ctx);
-    expect(ctx.ui.confirm).toHaveBeenCalledWith(
-      'Parallel authentication expired',
-      'Stored Parallel auth was rejected. Sign in again now?'
-    );
-    expect(mocks.runParallelSearch).toHaveBeenCalledTimes(2);
-    expect(result.content[0].text).toBe(JSON.stringify({ ok: true }, null, 2));
+    expect(mocks.runParallelSearch).toHaveBeenCalledTimes(1);
   });
 
   it('web_search should reject invalid PARALLEL_API_KEY values clearly', async () => {

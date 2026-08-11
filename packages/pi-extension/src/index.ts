@@ -2,18 +2,18 @@ import { randomUUID } from 'node:crypto';
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from '@mariozechner/pi-coding-agent';
+} from '@earendil-works/pi-coding-agent';
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   formatSize,
   truncateHead,
-} from '@mariozechner/pi-coding-agent';
+} from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
 import {
-  clearStoredParallelApiKey,
   getParallelApiKey,
-  loginWithParallel,
+  getParallelAuthStatus,
+  registerParallelAuthProvider,
 } from './parallel-auth';
 import {
   isParallelAuthenticationError,
@@ -76,34 +76,24 @@ You should proactively use available web tools to ground your answers when doing
 export default function (pi: ExtensionAPI) {
   const parallelSessionId = randomUUID();
 
+  registerParallelAuthProvider(pi);
+
   async function resolveApiKey(ctx: ExtensionContext) {
     const apiKey = await getParallelApiKey(ctx);
     if (apiKey) {
       return apiKey;
     }
 
-    if (!ctx.hasUI) {
-      throw new Error(
-        'Parallel authentication required. Set PARALLEL_API_KEY or run `parallel-login` in interactive Pi.'
-      );
-    }
-
-    const ok = await ctx.ui.confirm(
-      'Parallel authentication required',
-      'This tool needs Parallel auth. Start browser login now?'
+    throw new Error(
+      'Parallel authentication required. Run `/login parallel` in Pi, or set PARALLEL_API_KEY.'
     );
-    if (!ok) {
-      throw new Error('Parallel authentication is required to use this tool.');
-    }
-
-    return await loginWithParallel(ctx);
   }
 
   async function runWithAuth<T>(
     ctx: ExtensionContext,
     request: (apiKey: string) => Promise<T>
   ) {
-    let apiKey = await resolveApiKey(ctx);
+    const apiKey = await resolveApiKey(ctx);
 
     try {
       return await request(apiKey);
@@ -118,32 +108,32 @@ export default function (pi: ExtensionAPI) {
         );
       }
 
-      clearStoredParallelApiKey(ctx);
-
-      if (!ctx.hasUI) {
-        throw new Error(
-          'Stored Parallel authentication was rejected. Run `parallel-login` in interactive Pi to sign in again.'
-        );
-      }
-
-      const ok = await ctx.ui.confirm(
-        'Parallel authentication expired',
-        'Stored Parallel auth was rejected. Sign in again now?'
+      throw new Error(
+        'Parallel rejected the stored credential. Run `/login parallel` in Pi to sign in again.'
       );
-      if (!ok) {
-        throw error;
-      }
-
-      apiKey = await loginWithParallel(ctx);
-      return await request(apiKey);
     }
   }
 
   pi.registerCommand('parallel-login', {
-    description: 'Run Parallel browser login and store the API key in Pi auth',
+    description: 'Show Parallel authentication status and how to sign in',
     handler: async (_args, ctx) => {
-      await loginWithParallel(ctx);
-      ctx.ui.notify('Parallel login completed.', 'info');
+      // getProviderAuthStatus is a synchronous snapshot that only knows about
+      // stored credentials, so ask for the resolved key to catch the env var too.
+      const apiKey = await getParallelApiKey(ctx);
+      if (!apiKey) {
+        ctx.ui.notify(
+          'Parallel is not authenticated. Run `/login parallel` to sign in, or set PARALLEL_API_KEY.',
+          'info'
+        );
+        return;
+      }
+
+      const status = getParallelAuthStatus(ctx);
+      const source = status.label ?? status.source ?? 'PARALLEL_API_KEY';
+      ctx.ui.notify(
+        `Parallel is authenticated (${source}). Run \`/login parallel\` to replace the credential, or \`/logout parallel\` to remove it.`,
+        'info'
+      );
     },
   });
 
