@@ -21,9 +21,10 @@
     "typebox": "^1.1.37"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": ">=0.83.0"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": ">=0.83.0",
     "@parallel-web/oauth": "workspace:*",
     "@types/node": "^20.0.0"
   },
