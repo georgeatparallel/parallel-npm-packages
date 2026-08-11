@@ -132,18 +132,19 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Upgrade npm
-        # Trusted publishing (OIDC) requires npm >= 11.5.1, newer than the
-        # version bundled with Node 20. Without this, publish fails with a
+        # Trusted publishing (OIDC) requires npm >= 11.5.1. Node 24 already
+        # bundles a new enough npm, but pinning to latest keeps this working if
+        # the runner's Node ever moves back. Without it, publish fails with a
         # misleading 404 on the PUT to the registry.
         run: npm install -g npm@latest
 

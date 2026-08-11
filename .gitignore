@@ -14,11 +14,10 @@ coverage/
 .env
 .env.local
 .env.*.local
-.envrc
 
-.direnv
-flake.nix
-flake.lock
+# Nix: flake.nix and flake.lock are tracked; direnv setup is per-developer
+.envrc
+.direnv/
 
 # IDE
 .vscode/
