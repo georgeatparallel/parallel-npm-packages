@@ -1,6 +1,23 @@
 packages:
   - 'packages/*'
 
+# @earendil-works/pi-ai pulls in @aws-sdk/client-bedrock-runtime, whose @smithy/*
+# range deps float to the newest publish. pnpm 11 rejects any lockfile entry
+# published within minimumReleaseAge (24h by default), so an unlucky install can
+# resolve a just-published @smithy/* and produce a lockfile that CI refuses.
+# These pins hold that subtree at the last versions ahead of the cutoff.
+# Safe to drop and re-resolve once the pinned versions are well past 24h old.
+overrides:
+  '@smithy/core': 3.31.1
+  '@smithy/credential-provider-imds': 4.4.16
+  '@smithy/fetch-http-handler': 5.6.13
+  # pi-ai pins this one exactly; the identity entry keeps the blanket pin above
+  # from dragging its 4.7.3 up to 4.9.13.
+  '@smithy/node-http-handler': 4.9.13
+  '@smithy/node-http-handler@4.7.3': 4.7.3
+  '@smithy/signature-v4': 5.6.12
+  '@smithy/types': 4.16.1
+
 # pnpm >= 11 refuses to install unless every dependency lifecycle script is
 # explicitly allowed or denied. esbuild's postinstall fetches its platform
 # binary; nothing else here needs to run code at install time.
