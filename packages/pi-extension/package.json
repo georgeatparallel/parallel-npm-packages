@@ -1,6 +1,6 @@
 {
   "name": "@parallel-web/pi-extension",
-  "version": "1.2.0-rc.1",
+  "version": "1.2.0-rc.2",
   "description": "Add web search and web fetch to your pi agent",
   "author": "Parallel Web",
   "license": "MIT",
