@@ -1,27 +1,29 @@
 # Publishing Guide
 
-This monorepo publishes three npm packages, each versioned, tagged, and released **independently**:
+This monorepo publishes four npm packages, each versioned, tagged, and released **independently**:
 
 - `@parallel-web/ai-sdk-tools` — `packages/ai-sdk-tools`
+- `@parallel-web/dsh-web-search` — `packages/dsh-web-search`
 - `@parallel-web/opencode-plugin` — `packages/opencode-plugin`
 - `@parallel-web/pi-extension` — `packages/pi-extension`
 
 (`@parallel-web/oauth` in `packages/parallel-oauth` is `private` — it is bundled into the
-packages above at build time and is never published.)
+OpenCode plugin and Pi extension at build time and is never published.)
 
 ## How releases work
 
-Releases are **PR-driven** and fully automated on merge — there is no manual "Run workflow"
-button to click.
+Routine releases are **PR-driven** and automated on merge. The manual exceptions are the
+one-time bootstrap for a new npm package and recovery from an interrupted publish.
 
 1. You run `./scripts/release.sh <package> <rc|stable|X.Y.Z>` locally. It bumps the version
    in that package's `package.json`, creates a `release/<package>-vX.Y.Z` branch, commits with
    message `chore(<package>): bump version to X.Y.Z`, pushes, and opens a PR.
 2. You review and merge the PR.
-3. `.github/workflows/release.yml` runs on the push to `main`. It detects which
-   `packages/*/package.json` changed, and for each whose `<package>-vX.Y.Z` git tag does not
-   yet exist, it builds + lints + type-checks + tests that package, publishes it to npm, creates
-   the git tag `<package>-vX.Y.Z`, and cuts a GitHub Release.
+3. `.github/workflows/release.yml` runs on the push to `main`. It detects existing public
+   packages whose version changed, and for each whose `<package>-vX.Y.Z` git tag does not yet
+   exist, it builds + lints + type-checks + tests that package, packs and publishes it to npm,
+   creates the git tag `<package>-vX.Y.Z`, and cuts a GitHub Release. Adding a package or editing
+   metadata without changing its version does not publish it.
 
 ### Per-package git tags
 
@@ -46,6 +48,36 @@ Publishing uses npm [trusted publishing](https://docs.npmjs.com/trusted-publishe
 OIDC — **no npm token is stored in the repo**. The workflow upgrades npm to the latest version
 first, because trusted publishing requires npm ≥ 11.5.1 (newer than what Node 20 bundles).
 Skipping that upgrade causes a misleading `404 Not Found` on the publish `PUT`.
+
+### First release of a new package
+
+npm requires a package to exist before its trusted publisher can be configured. Adding a package
+to this repository intentionally does not publish it. An npm organization owner must first publish
+the reviewed bootstrap release manually from a clean, updated `main` checkout:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm --filter @parallel-web/dsh-web-search check
+BOOTSTRAP_DIR="$(mktemp -d)"
+pnpm --dir packages/dsh-web-search pack --pack-destination "$BOOTSTRAP_DIR"
+BOOTSTRAP_TARBALL="$(find "$BOOTSTRAP_DIR" -name '*.tgz' -print -quit)"
+npm publish "$BOOTSTRAP_TARBALL" --access public --tag rc
+npm view @parallel-web/dsh-web-search dist-tags --json
+```
+
+The npm owner should inspect the tarball listing before the publish and complete npm's 2FA prompt.
+The explicit `--tag rc` is required: npm otherwise assigns even a prerelease version to `latest`.
+The bootstrap intentionally has no git tag or GitHub Release. After it succeeds, configure the
+package's trusted publisher for:
+
+- organization: `parallel-web`
+- repository: `parallel-npm-packages`
+- workflow: `release.yml`
+- allowed action: `npm publish`
+
+After that one-time bootstrap, use `scripts/release.sh` for every later RC and stable release; those
+releases create the package git tag and GitHub Release normally. Never add a long-lived npm publish
+token to this repository.
 
 ## Cutting a release
 
@@ -83,11 +115,16 @@ git fetch --tags && git tag -l 'ai-sdk-tools-v*'
 ## Re-publishing / manual trigger
 
 If a publish step failed after the version was already merged (so the tag was never created), use
-the workflow's `workflow_dispatch` input to re-run it for a single package at its current
-`package.json` version:
+the workflow's `workflow_dispatch` input on the `main` branch to re-run it for a single package at
+its current `package.json` version. The release detector rejects every other branch or tag:
 
 - Actions → **Release** → **Run workflow** → enter the package directory name (e.g.
   `opencode-plugin`).
+
+The workflow packs the package before checking npm. If that exact tarball is already published,
+it verifies the registry integrity and continues with tag and GitHub Release creation without
+publishing again. If the published contents differ or the registry lookup fails, the workflow
+stops before creating the tag.
 
 If the tag already exists the run is a no-op (the package is considered already released); bump
 to a new version with `scripts/release.sh` instead.

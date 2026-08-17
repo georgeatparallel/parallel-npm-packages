@@ -4,7 +4,7 @@ set -euo pipefail
 # Release script for the @parallel-web npm packages monorepo.
 #
 # Each package is versioned and tagged independently — git tags are namespaced
-# per package (e.g. ai-sdk-tools-v1.2.0) so the three packages never collide.
+# per package (e.g. ai-sdk-tools-v1.2.0) so packages never collide.
 #
 # Usage:
 #   ./scripts/release.sh <package> rc        # bump to next RC (1.0.0 -> 1.1.0-rc.1, or 1.1.0-rc.1 -> 1.1.0-rc.2)
@@ -12,7 +12,7 @@ set -euo pipefail
 #   ./scripts/release.sh <package> 1.2.0     # set an explicit version (X.Y.Z or X.Y.Z-rc.N)
 #
 #   <package> is the directory name under packages/, e.g.:
-#     ai-sdk-tools | opencode-plugin | pi-extension
+#     ai-sdk-tools | dsh-web-search | opencode-plugin | pi-extension
 #
 # What it does:
 #   1. Computes the next version for that package

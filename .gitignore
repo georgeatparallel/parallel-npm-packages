@@ -4,6 +4,7 @@ node_modules/
 
 # Build output
 dist/
+packages/dsh-web-search/lib/
 *.tsbuildinfo
 
 # Testing
@@ -36,9 +37,9 @@ yarn-error.log*
 
 # Misc
 .cache/
+.agent/
 temp/
 tmp/
 
 # Local opencode plugin scaffolding (npm lockfile in a pnpm repo)
 .opencode/
-

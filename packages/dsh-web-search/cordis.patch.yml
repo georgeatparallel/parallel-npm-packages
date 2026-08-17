@@ -1,0 +1,8 @@
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: parallel
+
+- insert:
+    - id: web-search-parallel
+      name: '@parallel-web/dsh-web-search'

@@ -19,11 +19,14 @@ overrides:
   '@smithy/types': 4.16.1
 
 # pnpm >= 11 refuses to install unless every dependency lifecycle script is
-# explicitly allowed or denied. esbuild's postinstall fetches its platform
-# binary; nothing else here needs to run code at install time.
+# explicitly allowed or denied. esbuild fetches its platform binary; DeepSeek
+# Harness uses its subprocess and terminal helpers during profile operations.
 allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': true
   '@google/genai': false
   esbuild: true
   koffi: false
   msgpackr-extract: false
+  node-addon-require-builtin: false
+  node-pty: true
   protobufjs: false

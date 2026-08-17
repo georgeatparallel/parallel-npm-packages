@@ -5,6 +5,7 @@ Monorepo for @parallel-web npm packages.
 ## Packages
 
 - [`@parallel-web/ai-sdk-tools`](./packages/ai-sdk-tools) - AI SDK tools for Parallel Web
+- [`@parallel-web/dsh-web-search`](./packages/dsh-web-search) - Parallel Search provider for DeepSeek Harness
 - [`@parallel-web/opencode-plugin`](./packages/opencode-plugin) - Opencode plugin for Parallel Web
 - [`@parallel-web/pi-extension`](./packages/pi-extension) - pi agent extension for Parallel Web
 - `@parallel-web/oauth` - Internal, unpublished shared PKCE OAuth helper. Bundled into the opencode plugin and pi extension at build time (`noExternal`), so it is never installed by consumers and is intentionally marked `private`.
@@ -84,7 +85,7 @@ pnpm --filter @parallel-web/ai-sdk-tools test
 1. Create a new directory in `packages/`
 2. Add a `package.json` with the package name `@parallel-web/package-name`
 3. Set up TypeScript config extending from root
-4. Add build configuration (tsup)
+4. Add build configuration appropriate for the package
 5. Implement your package
 
 ## Publishing

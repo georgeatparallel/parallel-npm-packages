@@ -3,8 +3,7 @@ name: Release
 # When a version-bump commit lands on main (from a merged release PR opened by
 # scripts/release.sh), publish any package whose version changed and that does
 # not yet have a tag. Each package is versioned and tagged independently — git
-# tags are namespaced per package (<package>-vX.Y.Z) so the three packages
-# never collide.
+# tags are namespaced per package (<package>-vX.Y.Z) so packages never collide.
 on:
   push:
     branches: [main]
@@ -43,75 +42,14 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_PACKAGE: ${{ github.event.inputs.package }}
           BEFORE: ${{ github.event.before }}
+          REF: ${{ github.ref }}
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-
-          # Build the candidate list of package.json paths to consider.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            CANDIDATES="packages/${INPUT_PACKAGE}/package.json"
-            if [ ! -f "$CANDIDATES" ]; then
-              echo "::error::no package found at $CANDIDATES"
-              exit 1
-            fi
-          else
-            BASE="$BEFORE"
-            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-              BASE="$(git rev-parse "$SHA^" 2>/dev/null || echo '')"
-            fi
-            if [ -n "$BASE" ]; then
-              CANDIDATES="$(git diff --name-only "$BASE" "$SHA" -- 'packages/*/package.json')"
-            else
-              CANDIDATES="$(git ls-files 'packages/*/package.json')"
-            fi
-          fi
-
-          echo "Candidate package.json files:"
-          echo "${CANDIDATES:-<none>}"
-
-          INCLUDES="[]"
-          for pkg_json in $CANDIDATES; do
-            [ -f "$pkg_json" ] || continue
-            name="$(basename "$(dirname "$pkg_json")")"
-            private="$(node -p "require('./$pkg_json').private === true")"
-            if [ "$private" = "true" ]; then
-              echo "skip $name: private package"
-              continue
-            fi
-            version="$(node -p "require('./$pkg_json').version")"
-            tag="${name}-v${version}"
-            if git show-ref --quiet --verify "refs/tags/$tag"; then
-              echo "skip $name: tag $tag already exists (already released)"
-              continue
-            fi
-            case "$version" in
-              *-rc.*) npm_tag="rc"; prerelease="true" ;;
-              *)      npm_tag="latest"; prerelease="false" ;;
-            esac
-            echo "release $name@$version -> tag $tag (dist-tag $npm_tag)"
-            INCLUDES="$(node -e "
-              const arr = JSON.parse(process.argv[1]);
-              arr.push({
-                name: process.argv[2],
-                dir: 'packages/' + process.argv[2],
-                version: process.argv[3],
-                tag: process.argv[4],
-                npm_tag: process.argv[5],
-                prerelease: process.argv[6] === 'true',
-              });
-              console.log(JSON.stringify(arr));
-            " "$INCLUDES" "$name" "$version" "$tag" "$npm_tag" "$prerelease")"
-          done
-
-          COUNT="$(node -p "JSON.parse(process.argv[1]).length" "$INCLUDES")"
-          if [ "$COUNT" = "0" ]; then
-            echo "any=false" >> "$GITHUB_OUTPUT"
-            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
-            echo "Nothing to release."
-          else
-            echo "any=true" >> "$GITHUB_OUTPUT"
-            echo "matrix={\"include\":$INCLUDES}" >> "$GITHUB_OUTPUT"
-          fi
+          RESULT="$(node scripts/detect-releases.mjs)"
+          echo "Release detection: $RESULT"
+          echo "any=$(node -p 'JSON.parse(process.argv[1]).any' "$RESULT")" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(node -p 'JSON.stringify(JSON.parse(process.argv[1]).matrix)' "$RESULT")" >> "$GITHUB_OUTPUT"
 
   release:
     name: Publish ${{ matrix.name }}@${{ matrix.version }}
@@ -171,9 +109,27 @@ jobs:
         working-directory: ${{ matrix.dir }}
         run: pnpm build
 
-      - name: Publish to npm
+      - name: Validate package metadata and contents
         working-directory: ${{ matrix.dir }}
-        run: npm publish --access public --tag ${{ matrix.npm_tag }}
+        run: |
+          pnpm run --if-present check:manifest
+          pnpm run --if-present check:package
+
+      - name: Pack and publish to npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          pack_dir="$(mktemp -d)"
+          trap 'rm -rf "$pack_dir"' EXIT
+
+          pnpm --dir "${{ matrix.dir }}" pack --pack-destination "$pack_dir"
+          artifact="$(find "$pack_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$artifact"
+
+          node scripts/publish-package.mjs \
+            --package-dir "${{ matrix.dir }}" \
+            --tarball "$artifact" \
+            --tag "${{ matrix.npm_tag }}"
 
       - name: Create tag and GitHub Release
         env:
@@ -205,5 +161,5 @@ jobs:
 
       - name: Summary
         run: |
-          echo "✅ Published @parallel-web/${{ matrix.name }}@${{ matrix.version }} (dist-tag: ${{ matrix.npm_tag }})"
+          echo "✅ Ensured @parallel-web/${{ matrix.name }}@${{ matrix.version }} is published (dist-tag: ${{ matrix.npm_tag }})"
           echo "Tag: ${{ matrix.tag }}"
