@@ -13,7 +13,7 @@ interface WebMcpDocument extends Document {
   modelContext?: {
     registerTool(
       tool: WebMcpTool,
-      options?: { signal?: AbortSignal }
+      options?: { signal?: AbortSignal; exposedTo?: string[] }
     ): Promise<void>;
   };
 }
@@ -312,8 +312,15 @@ function createTools(document: Document): WebMcpTool[] {
   ];
 }
 
+export interface ParallelWebMcpOptions {
+  /** Additional trusted origins allowed to discover and execute these tools. */
+  exposedTo?: string[];
+}
+
 /** Register Parallel's page-scoped search tools when the browser supports WebMCP. */
-export async function installParallelWebMcp(): Promise<boolean> {
+export async function installParallelWebMcp(
+  options: ParallelWebMcpOptions = {}
+): Promise<boolean> {
   if (typeof document === 'undefined') return false;
 
   const currentDocument = document as WebMcpDocument;
@@ -326,7 +333,12 @@ export async function installParallelWebMcp(): Promise<boolean> {
   const registration = new AbortController();
   const installation = Promise.all(
     createTools(currentDocument).map((tool) =>
-      context.registerTool(tool, { signal: registration.signal })
+      context.registerTool(tool, {
+        signal: registration.signal,
+        ...(options.exposedTo === undefined
+          ? {}
+          : { exposedTo: options.exposedTo }),
+      })
     )
   ).then(
     () => true,

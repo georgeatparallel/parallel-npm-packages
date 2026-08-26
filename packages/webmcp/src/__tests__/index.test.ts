@@ -71,6 +71,35 @@ describe('installParallelWebMcp', () => {
     expect(browser.context.registerTool).toHaveBeenCalledTimes(2);
   });
 
+  it('exposes both tools only to explicitly permitted cross-origin agents', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    const exposedTo = ['https://agent.example', 'https://partner.example'];
+
+    expect(await installParallelWebMcp({ exposedTo })).toBe(true);
+
+    for (const name of ['parallel_web_search', 'parallel_web_fetch']) {
+      expect(browser.context.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name }),
+        expect.objectContaining({ exposedTo })
+      );
+    }
+  });
+
+  it('keeps cross-origin access disabled unless explicitly configured', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+
+    await installParallelWebMcp();
+
+    for (const name of ['parallel_web_search', 'parallel_web_fetch']) {
+      expect(browser.context.registerTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name }),
+        expect.not.objectContaining({ exposedTo: expect.anything() })
+      );
+    }
+  });
+
   it('preserves unrelated page tools and rolls back partial registration', async () => {
     const unrelated = { name: 'page_owned_tool' } as TestTool;
     const browser = createBrowser({

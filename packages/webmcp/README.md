@@ -27,6 +27,20 @@ browser does not support WebMCP. Repeated calls are harmless, server-side
 rendering is safe, and unsupported browsers make no network requests. Tools are
 automatically removed when the page closes or navigates away.
 
+To share tools with an agent running on a different origin, explicitly allow its
+trusted origin when installing:
+
+```ts
+await installParallelWebMcp({
+  exposedTo: ['https://agent.example'],
+});
+```
+
+The agent must also request your site's origin through
+`document.modelContext.getTools({ fromOrigins: ['https://your-site.example'] })`.
+Cross-origin access is disabled by default. Use the configurable installer above
+instead of the self-installing script when cross-origin agents need access.
+
 After publication, sites can also load a version-pinned, self-installing module
 from an npm CDN:
 
@@ -51,7 +65,8 @@ For a production website:
   `Origin-Agent-Cluster: ?0`.
 - Register tools in the top-level document or a same-origin iframe. A
   cross-origin iframe also requires
-  `<iframe src="https://example.com" allow="tools"></iframe>` for registration.
+  `<iframe src="https://example.com" allow="tools"></iframe>` for registration;
+  discovering its tools from another origin additionally requires `exposedTo`.
 
 For local development only, enable `chrome://flags/#enable-webmcp-testing` and
 restart Chrome. The flag does not enable WebMCP for your site's visitors. See
