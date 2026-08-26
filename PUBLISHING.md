@@ -54,37 +54,29 @@ Skipping that upgrade causes a misleading `404 Not Found` on the publish `PUT`.
 
 npm requires a package to exist before its trusted publisher can be configured. Adding a package
 to this repository intentionally does not publish it. An npm organization owner must first publish
-the reviewed bootstrap release manually from a clean, updated `main` checkout:
+the reviewed bootstrap release manually from a clean, updated `main` checkout. Set `PACKAGE` to
+the new package's directory name, such as `webmcp` or `dsh-web-search`:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm --filter @parallel-web/dsh-web-search check
-BOOTSTRAP_DIR="$(mktemp -d)"
-pnpm --dir packages/dsh-web-search pack --pack-destination "$BOOTSTRAP_DIR"
-BOOTSTRAP_TARBALL="$(find "$BOOTSTRAP_DIR" -name '*.tgz' -print -quit)"
-npm publish "$BOOTSTRAP_TARBALL" --access public --tag rc
-npm view @parallel-web/dsh-web-search dist-tags --json
-```
-
-For `@parallel-web/webmcp`, use its existing typecheck, test, and build scripts
-instead:
-
-```bash
+PACKAGE=webmcp
 test -z "$(git status --porcelain)"
 git switch main
 git pull --ff-only
 pnpm install --frozen-lockfile
-pnpm exec eslint packages/webmcp
-pnpm exec prettier --check packages/webmcp
-pnpm --filter @parallel-web/webmcp typecheck
-pnpm --filter @parallel-web/webmcp test
-pnpm --filter @parallel-web/webmcp build
+pnpm exec eslint "packages/$PACKAGE"
+pnpm exec prettier --check "packages/$PACKAGE"
+pnpm --filter "@parallel-web/$PACKAGE" typecheck
+pnpm --filter "@parallel-web/$PACKAGE" test
+pnpm --filter "@parallel-web/$PACKAGE" build
+pnpm --filter "@parallel-web/$PACKAGE" run --if-present lint
+pnpm --filter "@parallel-web/$PACKAGE" run --if-present check:manifest
+pnpm --filter "@parallel-web/$PACKAGE" run --if-present check:package
 BOOTSTRAP_DIR="$(mktemp -d)"
-pnpm --dir packages/webmcp pack --pack-destination "$BOOTSTRAP_DIR"
+pnpm --dir "packages/$PACKAGE" pack --pack-destination "$BOOTSTRAP_DIR"
 BOOTSTRAP_TARBALL="$(find "$BOOTSTRAP_DIR" -name '*.tgz' -print -quit)"
 tar -tf "$BOOTSTRAP_TARBALL"
 npm publish "$BOOTSTRAP_TARBALL" --access public --tag rc
-npm view @parallel-web/webmcp dist-tags --json
+npm view "@parallel-web/$PACKAGE" dist-tags --json
 ```
 
 The npm owner should inspect the tarball listing before the publish and complete npm's 2FA prompt.

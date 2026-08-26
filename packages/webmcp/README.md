@@ -78,7 +78,8 @@ the [Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp) and the
 - Both tools are marked read-only and identify retrieved content as untrusted.
 - Search terms, requested URLs, and an anonymous per-tab session ID are sent to
   `https://search.parallel.ai/mcp`. The referrer includes only your site's
-  origin, not its path or query string. Browser credentials are never sent.
+  origin, not its path or query string. URL fragments and browser credentials are
+  never sent.
 - The browser adapter accepts only HTTP and HTTPS URLs and returns size-limited
   excerpts. Destination safety belongs to the existing Search MCP service.
 - Page content, cookies, signed-in user data, and agent history are never

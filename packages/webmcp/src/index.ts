@@ -52,10 +52,6 @@ function requiredString(value: unknown, name: string, limit: number): string {
   return value.trim();
 }
 
-function searchQuery(objective: string): string {
-  return Array.from(objective).slice(0, 100).join('');
-}
-
 function normalizeOutput(payload: unknown): Output {
   const data = payload as Record<string, unknown> | null;
   if (!Array.isArray(data?.results)) {
@@ -202,7 +198,8 @@ function createTransport(document: Document) {
 
     try {
       message = (await response.json()) as typeof message;
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error;
       throw new Error('Parallel Search returned an unexpected response.');
     }
 
@@ -260,7 +257,10 @@ function createTools(document: Document): WebMcpTool[] {
         const objective = requiredString(input.objective, 'objective', 500);
         return transport(
           'web_search',
-          { objective, search_queries: [searchQuery(objective)] },
+          {
+            objective,
+            search_queries: [Array.from(objective).slice(0, 100).join('')],
+          },
           options?.signal
         );
       },
@@ -281,9 +281,10 @@ function createTools(document: Document): WebMcpTool[] {
       annotations,
       execute(input, options) {
         const url = requiredString(input.url, 'url', 2_048);
+        let parsed: URL;
 
         try {
-          const parsed = new URL(url);
+          parsed = new URL(url);
           if (
             !['http:', 'https:'].includes(parsed.protocol) ||
             parsed.username ||
@@ -295,15 +296,14 @@ function createTools(document: Document): WebMcpTool[] {
           throw new Error('url must be a valid HTTP or HTTPS URL.');
         }
 
+        parsed.hash = '';
         const args: Record<string, unknown> = {
-          urls: [url],
+          urls: [parsed.href],
           full_content: false,
         };
 
         if (input.objective !== undefined) {
-          const objective = requiredString(input.objective, 'objective', 200);
-          args.objective = objective;
-          args.search_queries = [searchQuery(objective)];
+          args.objective = requiredString(input.objective, 'objective', 200);
         }
 
         return transport('web_fetch', args, options?.signal);

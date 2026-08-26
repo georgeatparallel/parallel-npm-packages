@@ -239,7 +239,7 @@ describe('installParallelWebMcp', () => {
       input: { url: 'https://example.com/article' },
     },
   ])(
-    'validates and truncates $name objectives by Unicode code point',
+    'validates $name objectives by Unicode code point',
     async ({ name, limit, input }) => {
       const browser = createBrowser();
       vi.stubGlobal('document', browser.document);
@@ -251,12 +251,18 @@ describe('installParallelWebMcp', () => {
       await tool.execute({ ...input, objective });
 
       const request = JSON.parse(String(fetch.mock.calls[0]![1].body)) as {
-        params: { arguments: { objective: string; search_queries: string[] } };
+        params: {
+          arguments: { objective: string; search_queries?: string[] };
+        };
       };
       expect(request.params.arguments.objective).toBe(objective);
-      expect(request.params.arguments.search_queries).toEqual([
-        `${'a'.repeat(99)}🌍`,
-      ]);
+      if (name === 'parallel_web_search') {
+        expect(request.params.arguments.search_queries).toEqual([
+          `${'a'.repeat(99)}🌍`,
+        ]);
+      } else {
+        expect(request.params.arguments).not.toHaveProperty('search_queries');
+      }
       expect(() =>
         tool.execute({ ...input, objective: `${objective}🌍` })
       ).toThrow(`1 to ${limit} characters`);
@@ -276,6 +282,25 @@ describe('installParallelWebMcp', () => {
         .execute({ url: 'https://username:password@example.com/article' })
     ).toThrow('HTTP or HTTPS');
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('never forwards URL fragments to the upstream fetch service', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    const fetch = mockSearch();
+    await installParallelWebMcp();
+
+    await browser.registered.get('parallel_web_fetch')!.execute({
+      url: 'https://example.com/article#access_token=private',
+    });
+
+    const request = JSON.parse(String(fetch.mock.calls[0]![1].body)) as {
+      params: { arguments: { urls: string[] } };
+    };
+    expect(request.params.arguments.urls).toEqual([
+      'https://example.com/article',
+    ]);
+    expect(String(fetch.mock.calls[0]![1].body)).not.toContain('private');
   });
 
   it('bounds untrusted UTF-8 output without exposing upstream metadata', async () => {
@@ -395,6 +420,30 @@ describe('installParallelWebMcp', () => {
         controller.abort();
         throw new DOMException('Aborted', 'AbortError');
       })
+    );
+    await installParallelWebMcp();
+
+    await expect(
+      browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'news' }, { signal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('preserves cancellation while reading an upstream response body', async () => {
+    const browser = createBrowser();
+    const controller = new AbortController();
+    vi.stubGlobal('document', browser.document);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+          controller.abort();
+          throw new DOMException('Aborted', 'AbortError');
+        },
+      }))
     );
     await installParallelWebMcp();
 
