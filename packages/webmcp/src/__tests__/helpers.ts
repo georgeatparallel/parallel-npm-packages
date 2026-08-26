@@ -1,20 +1,33 @@
 import { vi } from 'vitest';
-import type {
-  WebMcpDocument,
-  WebMcpModelContext,
-  WebMcpToolDescriptor,
-} from '../types.js';
+
+export interface TestTool {
+  name: string;
+  inputSchema: Record<string, unknown>;
+  annotations: Record<string, unknown>;
+  execute(
+    input: Record<string, unknown>,
+    options?: { signal?: AbortSignal }
+  ): Promise<unknown>;
+}
+
+interface TestContext {
+  registerTool(
+    tool: TestTool,
+    options?: { signal?: AbortSignal }
+  ): Promise<void>;
+  unregisterTool?(name: string): void;
+}
 
 export interface TestBrowser {
-  document: WebMcpDocument;
-  context: WebMcpModelContext;
-  registered: Map<string, WebMcpToolDescriptor>;
+  document: Document & { modelContext: TestContext };
+  context: TestContext;
+  registered: Map<string, TestTool>;
   storage: Map<string, string>;
 }
 
 export function createBrowser(
   options: {
-    existing?: WebMcpToolDescriptor[];
+    existing?: TestTool[];
     failOn?: string;
     storageBlocked?: boolean;
     storage?: Map<string, string>;
@@ -25,7 +38,7 @@ export function createBrowser(
   );
   const storage = options.storage ?? new Map<string, string>();
 
-  const context: WebMcpModelContext = {
+  const context: TestContext = {
     registerTool: vi.fn(async (tool, registration) => {
       if (registered.has(tool.name) || options.failOn === tool.name) {
         throw new Error(`Tool ${tool.name} is already registered.`);
@@ -57,7 +70,10 @@ export function createBrowser(
     },
   });
 
-  const document = { modelContext: context, defaultView } as WebMcpDocument;
+  const document = {
+    modelContext: context,
+    defaultView,
+  } as TestBrowser['document'];
   return { document, context, registered, storage };
 }
 

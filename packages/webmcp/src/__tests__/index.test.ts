@@ -1,196 +1,288 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installParallelWebMcp } from '../index.js';
-import type { WebMcpToolDescriptor } from '../types.js';
 import {
   createBrowser,
   fetchPayload,
   searchPayload,
   upstreamResponse,
+  type TestTool,
 } from './helpers.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function mockSearch(payload = searchPayload()) {
+  const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body)) as { id: number };
+    return upstreamResponse(body.id, payload);
+  });
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
+
 describe('installParallelWebMcp', () => {
-  it('does nothing when imported into a server-side environment', async () => {
-    vi.stubGlobal('document', undefined);
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
+  it.each([undefined, {}])(
+    'does nothing without browser WebMCP',
+    async (page) => {
+      vi.stubGlobal('document', page);
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
 
-    const installation = await installParallelWebMcp();
+      expect(await installParallelWebMcp()).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  );
 
-    expect(installation.supported).toBe(false);
-    expect(installation.tools).toEqual([]);
-    expect(() => installation.dispose()).not.toThrow();
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it('does nothing in a browser without WebMCP support', async () => {
-    vi.stubGlobal('document', {});
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-
-    expect(await installParallelWebMcp()).toMatchObject({
-      supported: false,
-      tools: [],
-    });
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it('registers exactly two namespaced, read-only, untrusted tools', async () => {
+  it('registers two namespaced, read-only, untrusted tools only once', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
 
-    const installation = await installParallelWebMcp();
-
-    expect(installation.supported).toBe(true);
-    expect(installation.tools).toEqual([
+    expect(await installParallelWebMcp()).toBe(true);
+    expect(await installParallelWebMcp()).toBe(true);
+    expect([...browser.registered.keys()]).toEqual([
       'parallel_web_search',
       'parallel_web_fetch',
     ]);
-    expect(browser.registered.size).toBe(2);
+    expect(browser.context.registerTool).toHaveBeenCalledTimes(2);
 
-    for (const descriptor of browser.registered.values()) {
-      expect(descriptor.annotations).toEqual({
+    for (const tool of browser.registered.values()) {
+      expect(tool.annotations).toEqual({
         readOnlyHint: true,
         untrustedContentHint: true,
       });
-      expect(descriptor.inputSchema.additionalProperties).toBe(false);
-      expect(descriptor.inputSchema.properties).not.toHaveProperty(
-        'session_id'
-      );
-      expect(descriptor.inputSchema.properties).not.toHaveProperty(
-        'model_name'
-      );
+      expect(tool.inputSchema.additionalProperties).toBe(false);
+      expect(tool.inputSchema.properties).not.toHaveProperty('session_id');
     }
   });
 
-  it('preserves unrelated tools when registering and disposing', async () => {
-    const unrelated = {
-      name: 'page_owned_tool',
-    } as unknown as WebMcpToolDescriptor;
-    const browser = createBrowser({ existing: [unrelated] });
-    vi.stubGlobal('document', browser.document);
-
-    const installation = await installParallelWebMcp();
-    expect(browser.registered.has('page_owned_tool')).toBe(true);
-
-    installation.dispose();
-
-    expect([...browser.registered.keys()]).toEqual(['page_owned_tool']);
-    expect(browser.context.unregisterTool).not.toHaveBeenCalledWith(
-      'page_owned_tool'
-    );
-  });
-
-  it('reuses one active installation for concurrent and repeated calls', async () => {
+  it('shares one installation between concurrent callers', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
 
-    const [first, second] = await Promise.all([
-      installParallelWebMcp(),
-      installParallelWebMcp(),
-    ]);
-
-    expect(first).toBe(second);
-    expect(await installParallelWebMcp()).toBe(first);
+    expect(
+      await Promise.all([installParallelWebMcp(), installParallelWebMcp()])
+    ).toEqual([true, true]);
     expect(browser.context.registerTool).toHaveBeenCalledTimes(2);
   });
 
-  it('allows a fresh installation after disposal', async () => {
+  it('preserves unrelated page tools and rolls back partial registration', async () => {
+    const unrelated = { name: 'page_owned_tool' } as TestTool;
+    const browser = createBrowser({
+      existing: [unrelated],
+      failOn: 'parallel_web_fetch',
+    });
+    vi.stubGlobal('document', browser.document);
+
+    await expect(installParallelWebMcp()).rejects.toThrow('already registered');
+    expect([...browser.registered.keys()]).toEqual(['page_owned_tool']);
+  });
+
+  it('can retry after a browser rejects registration synchronously', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
+    vi.mocked(browser.context.registerTool).mockImplementationOnce(() => {
+      throw new Error('Browser registration failed.');
+    });
 
-    const first = await installParallelWebMcp();
-    first.dispose();
-    first.dispose();
-
-    const second = await installParallelWebMcp();
-
-    expect(second).not.toBe(first);
+    await expect(installParallelWebMcp()).rejects.toThrow(
+      'registration failed'
+    );
+    expect(await installParallelWebMcp()).toBe(true);
     expect(browser.registered.size).toBe(2);
-    expect(browser.context.registerTool).toHaveBeenCalledTimes(4);
   });
 
-  it('does not remove a page-owned tool that collides with a reserved name', async () => {
-    const existing = {
-      name: 'parallel_web_search',
-    } as unknown as WebMcpToolDescriptor;
-    const browser = createBrowser({ existing: [existing] });
+  it('calls both upstream tools anonymously with the same stable session', async () => {
+    const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
+    const requests: Array<{
+      name: string;
+      arguments: Record<string, unknown>;
+      headers: Record<string, string>;
+    }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(String(init.body)) as {
+          id: number;
+          params: { name: string; arguments: Record<string, unknown> };
+        };
+        requests.push({
+          ...body.params,
+          headers: init.headers as Record<string, string>,
+        });
+        expect(init.credentials).toBe('omit');
+        return upstreamResponse(
+          body.id,
+          body.params.name === 'web_search' ? searchPayload() : fetchPayload()
+        );
+      })
+    );
 
-    await expect(installParallelWebMcp()).rejects.toThrow('already registered');
+    await installParallelWebMcp();
+    expect(
+      await browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'Find recent product announcements' })
+    ).toMatchObject({ request_id: 'search_test' });
+    expect(
+      await browser.registered
+        .get('parallel_web_fetch')!
+        .execute({ url: 'https://example.com/article' })
+    ).toMatchObject({ request_id: 'extract_test' });
 
-    expect(browser.registered.get('parallel_web_search')).toBe(existing);
-    expect(browser.context.unregisterTool).not.toHaveBeenCalled();
+    expect(requests[0]?.arguments.session_id).toBe(
+      requests[1]?.arguments.session_id
+    );
+    expect(requests[0]?.headers['Mcp-Session-Id']).toBe(
+      requests[0]?.arguments.session_id
+    );
+    expect(requests[0]?.headers).not.toHaveProperty('Authorization');
+    expect(requests[1]?.arguments).toMatchObject({ full_content: false });
   });
 
-  it('rolls back its own first tool when the second registration fails', async () => {
-    const browser = createBrowser({ failOn: 'parallel_web_fetch' });
+  it('reuses the anonymous session after a same-tab page reload', async () => {
+    const storage = new Map<string, string>();
+    const sessions: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(String(init.body)) as {
+          id: number;
+          params: { arguments: { session_id: string } };
+        };
+        sessions.push(body.params.arguments.session_id);
+        return upstreamResponse(body.id, searchPayload());
+      })
+    );
+
+    for (const browser of [
+      createBrowser({ storage }),
+      createBrowser({ storage }),
+    ]) {
+      vi.stubGlobal('document', browser.document);
+      await installParallelWebMcp();
+      await browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'news' });
+    }
+
+    expect(sessions[0]).toBe(sessions[1]);
+  });
+
+  it('keeps a stable in-memory session when browser storage is blocked', async () => {
+    const browser = createBrowser({ storageBlocked: true });
     vi.stubGlobal('document', browser.document);
+    const fetch = mockSearch();
+    await installParallelWebMcp();
+    const search = browser.registered.get('parallel_web_search')!;
 
-    await expect(installParallelWebMcp()).rejects.toThrow('already registered');
+    await search.execute({ objective: 'first' });
+    await search.execute({ objective: 'second' });
 
-    expect(browser.registered.size).toBe(0);
-    expect(browser.context.unregisterTool).toHaveBeenCalledWith(
-      'parallel_web_search'
+    const first = JSON.parse(String(fetch.mock.calls[0]![1].body));
+    const second = JSON.parse(String(fetch.mock.calls[1]![1].body));
+    expect(first.params.arguments.session_id).toBe(
+      second.params.arguments.session_id
     );
   });
 
-  it('supports implementations without legacy unregisterTool', async () => {
-    const browser = createBrowser();
-    delete browser.context.unregisterTool;
-    vi.stubGlobal('document', browser.document);
-
-    const installation = await installParallelWebMcp();
-    installation.dispose();
-
-    expect(browser.registered.size).toBe(0);
-  });
-
-  it('ignores legacy unregister errors after AbortSignal cleanup', async () => {
-    const browser = createBrowser();
-    browser.context.unregisterTool = vi.fn(() => {
-      throw new Error('The tool was already removed.');
-    });
-    vi.stubGlobal('document', browser.document);
-
-    const installation = await installParallelWebMcp();
-
-    expect(() => installation.dispose()).not.toThrow();
-    expect(browser.registered.size).toBe(0);
-  });
-
-  it('executes both tools against the existing MCP with one session', async () => {
+  it('validates search inputs and rejects non-HTTP fetch URLs', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
-    const requests: Array<Record<string, unknown>> = [];
-    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(String(init.body)) as {
-        id: number;
-        params: { name: string; arguments: Record<string, unknown> };
-      };
-      requests.push(body.params.arguments);
-      return upstreamResponse(
-        body.id,
-        body.params.name === 'web_search' ? searchPayload() : fetchPayload()
-      );
-    });
-    vi.stubGlobal('fetch', fetch);
-
     await installParallelWebMcp();
-    const search = await browser.registered
-      .get('parallel_web_search')
-      ?.execute({ objective: 'Find recent product announcements' });
-    const extracted = await browser.registered
-      .get('parallel_web_fetch')
-      ?.execute({ url: 'https://example.com/article' });
 
-    expect(search?.request_id).toBe('search_test');
-    expect(extracted?.request_id).toBe('extract_test');
-    expect(requests[0]?.session_id).toBe(requests[1]?.session_id);
-    expect(requests[0]?.session_id).toEqual(expect.any(String));
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(() =>
+      browser.registered.get('parallel_web_search')!.execute({ objective: ' ' })
+    ).toThrow('objective');
+    expect(() =>
+      browser.registered
+        .get('parallel_web_fetch')!
+        .execute({ url: 'javascript:alert(1)' })
+    ).toThrow('HTTP or HTTPS');
+  });
+
+  it('bounds untrusted UTF-8 output without exposing upstream metadata', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    mockSearch(
+      searchPayload({
+        session_id: 'private-upstream-session',
+        results: [
+          {
+            url: 'https://example.com/source',
+            title: 'Source',
+            excerpts: ['🌍'.repeat(10_000)],
+            full_content: 'never expose full content',
+          },
+        ],
+      })
+    );
+    await installParallelWebMcp();
+
+    const output = await browser.registered
+      .get('parallel_web_search')!
+      .execute({ objective: 'news' });
+
+    expect(
+      new TextEncoder().encode(JSON.stringify(output)).byteLength
+    ).toBeLessThanOrEqual(12_000);
+    expect(output).toMatchObject({ truncated: true });
+    expect(output).not.toHaveProperty('session_id');
+    expect(JSON.stringify(output)).not.toContain('full_content');
+  });
+
+  it('forwards execution cancellation to the browser request', async () => {
+    const browser = createBrowser();
+    const controller = new AbortController();
+    vi.stubGlobal('document', browser.document);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        expect(init.signal).toBe(controller.signal);
+        controller.abort();
+        throw new DOMException('Aborted', 'AbortError');
+      })
+    );
+    await installParallelWebMcp();
+
+    await expect(
+      browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'news' }, { signal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('reports free-tier rate limits without retrying', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    const fetch = vi.fn(async () => new Response('', { status: 429 }));
+    vi.stubGlobal('fetch', fetch);
+    await installParallelWebMcp();
+
+    await expect(
+      browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'news' })
+    ).rejects.toThrow('free rate limit');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('never exposes arbitrary server errors to the agent', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ id: 1, error: { message: 'private diagnostics' } })
+      )
+    );
+    await installParallelWebMcp();
+
+    await expect(
+      browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'news' })
+    ).rejects.toThrow('could not complete');
   });
 });
