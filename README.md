@@ -8,6 +8,7 @@ Monorepo for @parallel-web npm packages.
 - [`@parallel-web/dsh-web-search`](./packages/dsh-web-search) - Parallel Search provider for DeepSeek Harness
 - [`@parallel-web/opencode-plugin`](./packages/opencode-plugin) - Opencode plugin for Parallel Web
 - [`@parallel-web/pi-extension`](./packages/pi-extension) - pi agent extension for Parallel Web
+- [`@parallel-web/webmcp`](./packages/webmcp) - Free, browser-native web search and fetch tools for WebMCP-enabled websites
 - `@parallel-web/oauth` - Internal, unpublished shared PKCE OAuth helper. Bundled into the opencode plugin and pi extension at build time (`noExternal`), so it is never installed by consumers and is intentionally marked `private`.
 
 ## Development

@@ -1,11 +1,12 @@
 # Publishing Guide
 
-This monorepo publishes four npm packages, each versioned, tagged, and released **independently**:
+This monorepo publishes five npm packages, each versioned, tagged, and released **independently**:
 
 - `@parallel-web/ai-sdk-tools` — `packages/ai-sdk-tools`
 - `@parallel-web/dsh-web-search` — `packages/dsh-web-search`
 - `@parallel-web/opencode-plugin` — `packages/opencode-plugin`
 - `@parallel-web/pi-extension` — `packages/pi-extension`
+- `@parallel-web/webmcp` — `packages/webmcp`
 
 (`@parallel-web/oauth` in `packages/parallel-oauth` is `private` — it is bundled into the
 OpenCode plugin and Pi extension at build time and is never published.)
@@ -67,6 +68,9 @@ npm view @parallel-web/dsh-web-search dist-tags --json
 
 The npm owner should inspect the tarball listing before the publish and complete npm's 2FA prompt.
 The explicit `--tag rc` is required: npm otherwise assigns even a prerelease version to `latest`.
+For a first-time `@parallel-web/webmcp` release, run the same bootstrap flow with
+`packages/webmcp`, then verify `npm view @parallel-web/webmcp dist-tags --json` before
+sharing the package. An RC must not remain on the `latest` dist-tag.
 The bootstrap intentionally has no git tag or GitHub Release. After it succeeds, configure the
 package's trusted publisher for:
 
