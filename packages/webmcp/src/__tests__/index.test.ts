@@ -202,6 +202,21 @@ describe('installParallelWebMcp', () => {
     ).toThrow('HTTP or HTTPS');
   });
 
+  it('rejects fetch URLs containing embedded credentials before contacting Parallel', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await installParallelWebMcp();
+
+    expect(() =>
+      browser.registered
+        .get('parallel_web_fetch')!
+        .execute({ url: 'https://username:password@example.com/article' })
+    ).toThrow('HTTP or HTTPS');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('bounds untrusted UTF-8 output without exposing upstream metadata', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
@@ -230,6 +245,51 @@ describe('installParallelWebMcp', () => {
     expect(output).toMatchObject({ truncated: true });
     expect(output).not.toHaveProperty('session_id');
     expect(JSON.stringify(output)).not.toContain('full_content');
+  });
+
+  it('preserves later source citations when an earlier excerpt exceeds the output limit', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    const sources = Array.from({ length: 5 }, (_, index) => ({
+      url: `https://example.com/source-${index}`,
+      title: `Source ${index}`,
+      excerpts: [index === 0 ? '🌍'.repeat(10_000) : `Excerpt ${index}`],
+    }));
+    mockSearch(searchPayload({ results: sources }));
+    await installParallelWebMcp();
+
+    const output = (await browser.registered
+      .get('parallel_web_search')!
+      .execute({ objective: 'news' })) as {
+      results: Array<{ url: string }>;
+      truncated: boolean;
+    };
+
+    expect(output.results.map((source) => source.url)).toEqual(
+      sources.map((source) => source.url)
+    );
+    expect(output.truncated).toBe(true);
+    expect(
+      new TextEncoder().encode(JSON.stringify(output)).byteLength
+    ).toBeLessThanOrEqual(12_000);
+  });
+
+  it('accepts standard MCP text results when structured content is absent', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        upstreamResponse(1, searchPayload(), { structured: false })
+      )
+    );
+    await installParallelWebMcp();
+
+    await expect(
+      browser.registered
+        .get('parallel_web_search')!
+        .execute({ objective: 'news' })
+    ).resolves.toMatchObject({ request_id: 'search_test' });
   });
 
   it('forwards execution cancellation to the browser request', async () => {

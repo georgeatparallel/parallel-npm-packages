@@ -34,6 +34,7 @@ function normalizeOutput(payload: unknown, tool: string): Output {
     results: [],
     truncated: data.results.length > 5,
   };
+  const sourceExcerpts: unknown[] = [];
 
   for (const value of data.results) {
     if (output.results.length === 5) break;
@@ -68,8 +69,14 @@ function normalizeOutput(payload: unknown, tool: string): Output {
       break;
     }
 
-    if (!Array.isArray(item!.excerpts)) continue;
-    for (const excerpt of item!.excerpts) {
+    sourceExcerpts.push(item!.excerpts);
+  }
+
+  for (const [index, source] of output.results.entries()) {
+    const excerpts = sourceExcerpts[index];
+    if (!Array.isArray(excerpts)) continue;
+
+    for (const excerpt of excerpts) {
       if (typeof excerpt !== 'string') {
         output.truncated = true;
         continue;
@@ -167,7 +174,11 @@ export function createTransport(document: Document) {
     let message: {
       id?: unknown;
       error?: unknown;
-      result?: { isError?: boolean; structuredContent?: unknown };
+      result?: {
+        isError?: boolean;
+        structuredContent?: unknown;
+        content?: Array<{ type?: unknown; text?: unknown }>;
+      };
     };
 
     try {
@@ -183,6 +194,19 @@ export function createTransport(document: Document) {
       throw new Error('Parallel Search could not complete the request.');
     }
 
-    return normalizeOutput(message.result.structuredContent, tool);
+    if (message.result.structuredContent !== undefined) {
+      return normalizeOutput(message.result.structuredContent, tool);
+    }
+
+    const text = message.result.content?.find(
+      (item) => item.type === 'text'
+    )?.text;
+
+    try {
+      if (typeof text !== 'string') throw new Error();
+      return normalizeOutput(JSON.parse(text) as unknown, tool);
+    } catch {
+      throw new Error('Parallel Search returned an unexpected response.');
+    }
   };
 }

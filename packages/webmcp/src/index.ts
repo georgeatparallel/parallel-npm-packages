@@ -98,7 +98,12 @@ function createTools(document: Document): WebMcpTool[] {
         const url = requiredString(input.url, 'url', 2_048);
 
         try {
-          if (!['http:', 'https:'].includes(new URL(url).protocol)) {
+          const parsed = new URL(url);
+          if (
+            !['http:', 'https:'].includes(parsed.protocol) ||
+            parsed.username ||
+            parsed.password
+          ) {
             throw new Error();
           }
         } catch {
