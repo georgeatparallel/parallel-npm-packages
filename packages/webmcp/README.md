@@ -38,17 +38,32 @@ from an npm CDN:
 ></script>
 ```
 
-WebMCP is a proposed browser standard, so an agent must visit the page in a
-browser that exposes `document.modelContext.registerTool`. For local Chrome
-development, enable `chrome://flags/#enable-webmcp-testing`. See the
-[Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp) and the
+## Browser requirements
+
+WebMCP is a proposed browser standard, so agents need a browser that exposes
+`document.modelContext.registerTool` when they visit your page.
+
+For a production website:
+
+- Use Chrome 149 or later and enroll your site's origin in the
+  [WebMCP origin trial](https://developer.chrome.com/origintrials/#/register_trial/4163014905550602241).
+- Serve the page over HTTPS and keep it origin-isolated. Do not opt out with
+  `Origin-Agent-Cluster: ?0`.
+- Register tools in the top-level document or a same-origin iframe. A
+  cross-origin iframe also requires
+  `<iframe src="https://example.com" allow="tools"></iframe>` for registration.
+
+For local development only, enable `chrome://flags/#enable-webmcp-testing` and
+restart Chrome. The flag does not enable WebMCP for your site's visitors. See
+the [Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp) and the
 [WebMCP specification](https://webmachinelearning.github.io/webmcp/).
 
 ## Security and privacy
 
 - Both tools are marked read-only and identify retrieved content as untrusted.
 - Search terms, requested URLs, and an anonymous per-tab session ID are sent to
-  `https://search.parallel.ai/mcp`. Browser credentials are never sent.
+  `https://search.parallel.ai/mcp`. The referrer includes only your site's
+  origin, not its path or query string. Browser credentials are never sent.
 - The browser adapter accepts only HTTP and HTTPS URLs and returns size-limited
   excerpts. Destination safety belongs to the existing Search MCP service.
 - Page content, cookies, signed-in user data, and agent history are never

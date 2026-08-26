@@ -66,6 +66,27 @@ npm publish "$BOOTSTRAP_TARBALL" --access public --tag rc
 npm view @parallel-web/dsh-web-search dist-tags --json
 ```
 
+For `@parallel-web/webmcp`, use its existing typecheck, test, and build scripts
+instead:
+
+```bash
+test -z "$(git status --porcelain)"
+git switch main
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm exec eslint packages/webmcp
+pnpm exec prettier --check packages/webmcp
+pnpm --filter @parallel-web/webmcp typecheck
+pnpm --filter @parallel-web/webmcp test
+pnpm --filter @parallel-web/webmcp build
+BOOTSTRAP_DIR="$(mktemp -d)"
+pnpm --dir packages/webmcp pack --pack-destination "$BOOTSTRAP_DIR"
+BOOTSTRAP_TARBALL="$(find "$BOOTSTRAP_DIR" -name '*.tgz' -print -quit)"
+tar -tf "$BOOTSTRAP_TARBALL"
+npm publish "$BOOTSTRAP_TARBALL" --access public --tag rc
+npm view @parallel-web/webmcp dist-tags --json
+```
+
 The npm owner should inspect the tarball listing before the publish and complete npm's 2FA prompt.
 The explicit `--tag rc` is required: npm otherwise assigns even a prerelease version to `latest`.
 The bootstrap intentionally has no git tag or GitHub Release. After it succeeds, configure the

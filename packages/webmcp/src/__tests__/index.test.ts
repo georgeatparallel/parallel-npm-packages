@@ -103,6 +103,7 @@ describe('installParallelWebMcp', () => {
           headers: init.headers as Record<string, string>,
         });
         expect(init.credentials).toBe('omit');
+        expect(init.referrerPolicy).toBe('origin');
         return upstreamResponse(
           body.id,
           body.params.name === 'web_search' ? searchPayload() : fetchPayload()
@@ -197,6 +198,42 @@ describe('installParallelWebMcp', () => {
     ).toThrow('HTTP or HTTPS');
   });
 
+  it.each([
+    {
+      name: 'parallel_web_search',
+      limit: 500,
+      input: {},
+    },
+    {
+      name: 'parallel_web_fetch',
+      limit: 200,
+      input: { url: 'https://example.com/article' },
+    },
+  ])(
+    'validates and truncates $name objectives by Unicode code point',
+    async ({ name, limit, input }) => {
+      const browser = createBrowser();
+      vi.stubGlobal('document', browser.document);
+      const fetch = mockSearch();
+      await installParallelWebMcp();
+
+      const objective = `${'a'.repeat(99)}${'🌍'.repeat(limit - 99)}`;
+      const tool = browser.registered.get(name)!;
+      await tool.execute({ ...input, objective });
+
+      const request = JSON.parse(String(fetch.mock.calls[0]![1].body)) as {
+        params: { arguments: { objective: string; search_queries: string[] } };
+      };
+      expect(request.params.arguments.objective).toBe(objective);
+      expect(request.params.arguments.search_queries).toEqual([
+        `${'a'.repeat(99)}🌍`,
+      ]);
+      expect(() =>
+        tool.execute({ ...input, objective: `${objective}🌍` })
+      ).toThrow(`1 to ${limit} characters`);
+    }
+  );
+
   it('rejects fetch URLs containing embedded credentials before contacting Parallel', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
@@ -283,6 +320,41 @@ describe('installParallelWebMcp', () => {
     });
   });
 
+  it.each([true, false])(
+    'rejects failed webpage extraction from structured=%s MCP responses',
+    async (structured) => {
+      const browser = createBrowser();
+      vi.stubGlobal('document', browser.document);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          upstreamResponse(
+            1,
+            {
+              results: [],
+              errors: [
+                {
+                  error_type: 'http_error',
+                  message: 'private upstream diagnostics',
+                },
+              ],
+            },
+            { structured }
+          )
+        )
+      );
+      await installParallelWebMcp();
+
+      await expect(
+        browser.registered
+          .get('parallel_web_fetch')!
+          .execute({ url: 'https://example.com/missing' })
+      ).rejects.toThrow(
+        'Parallel Search could not fetch the requested webpage.'
+      );
+    }
+  );
+
   it('forwards execution cancellation to the browser request', async () => {
     const browser = createBrowser();
     const controller = new AbortController();
@@ -319,23 +391,54 @@ describe('installParallelWebMcp', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('never exposes arbitrary server errors to the agent', async () => {
+  it('recognizes free-tier rate limits wrapped in successful JSON-RPC responses', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        Response.json({ id: 1, error: { message: 'private diagnostics' } })
-      )
+    const fetch = vi.fn(async () =>
+      Response.json({
+        jsonrpc: '2.0',
+        id: 1,
+        error: {
+          code: -32000,
+          message:
+            "You've hit the free-tier rate limit for Parallel Search MCP. " +
+            'To continue with higher limits, add your own API key.',
+        },
+      })
     );
+    vi.stubGlobal('fetch', fetch);
     await installParallelWebMcp();
 
     await expect(
       browser.registered
         .get('parallel_web_search')!
         .execute({ objective: 'news' })
-    ).rejects.toThrow('could not complete');
+    ).rejects.toThrow(
+      'Parallel Search reached its free rate limit. Try again later.'
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['private diagnostics', 'rate limit reached: private diagnostics'])(
+    'never exposes arbitrary server errors to the agent: %s',
+    async (message) => {
+      const browser = createBrowser();
+      vi.stubGlobal('document', browser.document);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json({ id: 1, error: { code: -32000, message } })
+        )
+      );
+      await installParallelWebMcp();
+
+      await expect(
+        browser.registered
+          .get('parallel_web_search')!
+          .execute({ objective: 'news' })
+      ).rejects.toThrow('could not complete');
+    }
+  );
 
   it('registers both tools from the self-installing entry point', async () => {
     const browser = createBrowser();

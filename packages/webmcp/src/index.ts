@@ -32,6 +32,8 @@ interface Output {
 
 const ENDPOINT = 'https://search.parallel.ai/mcp';
 const SESSION_KEY = 'parallel:webmcp:session:v1';
+const RATE_LIMIT_MESSAGE =
+  'Parallel Search reached its free rate limit. Try again later.';
 const MAX_OUTPUT_BYTES = 12_000;
 const MAX_EXCERPT_CHARACTERS = 2_000;
 const encoder = new TextEncoder();
@@ -39,17 +41,28 @@ const installations = new WeakMap<Document, Promise<boolean>>();
 const annotations = { readOnlyHint: true, untrustedContentHint: true } as const;
 
 function requiredString(value: unknown, name: string, limit: number): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > limit) {
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    Array.from(value).length > limit
+  ) {
     throw new Error(`${name} must contain 1 to ${limit} characters.`);
   }
 
   return value.trim();
 }
 
+function searchQuery(objective: string): string {
+  return Array.from(objective).slice(0, 100).join('');
+}
+
 function normalizeOutput(payload: unknown): Output {
   const data = payload as Record<string, unknown> | null;
   if (!Array.isArray(data?.results)) {
     throw new Error('Parallel Search returned an unexpected response.');
+  }
+  if (Array.isArray(data.errors) && data.errors.length > 0) {
+    throw new Error('Parallel Search could not fetch the requested webpage.');
   }
 
   const output: Output = {
@@ -146,6 +159,7 @@ function createTransport(document: Document) {
       response = await fetch(ENDPOINT, {
         method: 'POST',
         credentials: 'omit',
+        referrerPolicy: 'origin',
         redirect: 'error',
         headers: {
           'Content-Type': 'application/json',
@@ -171,16 +185,14 @@ function createTransport(document: Document) {
     }
 
     if (response.status === 429) {
-      throw new Error(
-        'Parallel Search reached its free rate limit. Try again later.'
-      );
+      throw new Error(RATE_LIMIT_MESSAGE);
     }
     if (!response.ok) {
       throw new Error(`Parallel Search returned HTTP ${response.status}.`);
     }
 
     let message: {
-      error?: unknown;
+      error?: { code?: unknown; message?: unknown };
       result?: {
         isError?: boolean;
         structuredContent?: unknown;
@@ -194,6 +206,16 @@ function createTransport(document: Document) {
       throw new Error('Parallel Search returned an unexpected response.');
     }
 
+    if (
+      message.error?.code === -32000 &&
+      typeof message.error.message === 'string' &&
+      message.error.message.includes(
+        'free-tier rate limit for Parallel Search MCP'
+      )
+    ) {
+      throw new Error(RATE_LIMIT_MESSAGE);
+    }
+
     if (message.error || message.result?.isError || !message.result) {
       throw new Error('Parallel Search could not complete the request.');
     }
@@ -202,15 +224,18 @@ function createTransport(document: Document) {
       return normalizeOutput(message.result.structuredContent);
     }
 
+    let payload: unknown;
     try {
       const text = message.result.content?.find(
         (item) => item.type === 'text'
       )?.text;
       if (typeof text !== 'string') throw new Error();
-      return normalizeOutput(JSON.parse(text) as unknown);
+      payload = JSON.parse(text) as unknown;
     } catch {
       throw new Error('Parallel Search returned an unexpected response.');
     }
+
+    return normalizeOutput(payload);
   };
 }
 
@@ -235,7 +260,7 @@ function createTools(document: Document): WebMcpTool[] {
         const objective = requiredString(input.objective, 'objective', 500);
         return transport(
           'web_search',
-          { objective, search_queries: [objective.slice(0, 100)] },
+          { objective, search_queries: [searchQuery(objective)] },
           options?.signal
         );
       },
@@ -278,7 +303,7 @@ function createTools(document: Document): WebMcpTool[] {
         if (input.objective !== undefined) {
           const objective = requiredString(input.objective, 'objective', 200);
           args.objective = objective;
-          args.search_queries = [objective.slice(0, 100)];
+          args.search_queries = [searchQuery(objective)];
         }
 
         return transport('web_fetch', args, options?.signal);
