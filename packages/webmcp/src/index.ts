@@ -1,7 +1,5 @@
-import { createTransport } from './transport.js';
-
 interface WebMcpTool {
-  name: string;
+  name: 'parallel_web_search' | 'parallel_web_fetch';
   description: string;
   inputSchema: Record<string, unknown>;
   annotations: { readOnlyHint: true; untrustedContentHint: true };
@@ -16,11 +14,27 @@ interface WebMcpDocument extends Document {
     registerTool(
       tool: WebMcpTool,
       options?: { signal?: AbortSignal }
-    ): void | Promise<void>;
-    unregisterTool?(name: string): void;
+    ): Promise<void>;
   };
 }
 
+interface Source {
+  url: string;
+  title: string | null;
+  publish_date: string | null;
+  excerpts: string[];
+}
+
+interface Output {
+  results: Source[];
+  truncated: boolean;
+}
+
+const ENDPOINT = 'https://search.parallel.ai/mcp';
+const SESSION_KEY = 'parallel:webmcp:session:v1';
+const MAX_OUTPUT_BYTES = 12_000;
+const MAX_EXCERPT_CHARACTERS = 2_000;
+const encoder = new TextEncoder();
 const installations = new WeakMap<Document, Promise<boolean>>();
 const annotations = { readOnlyHint: true, untrustedContentHint: true } as const;
 
@@ -30,6 +44,174 @@ function requiredString(value: unknown, name: string, limit: number): string {
   }
 
   return value.trim();
+}
+
+function normalizeOutput(payload: unknown): Output {
+  const data = payload as Record<string, unknown> | null;
+  if (!Array.isArray(data?.results)) {
+    throw new Error('Parallel Search returned an unexpected response.');
+  }
+
+  const output: Output = {
+    results: [],
+    truncated: data.results.length > 5,
+  };
+  const sourceExcerpts: unknown[] = [];
+
+  for (const value of data.results) {
+    if (output.results.length === 5) break;
+    const item = value as Record<string, unknown> | null;
+
+    try {
+      if (typeof item?.url !== 'string' || item.url.length > 2_048) {
+        throw new Error();
+      }
+      if (!['http:', 'https:'].includes(new URL(item.url).protocol)) {
+        throw new Error();
+      }
+    } catch {
+      output.truncated = true;
+      continue;
+    }
+
+    const source: Source = {
+      url: item!.url as string,
+      title: typeof item!.title === 'string' ? item!.title.slice(0, 200) : null,
+      publish_date:
+        typeof item!.publish_date === 'string'
+          ? item!.publish_date.slice(0, 32)
+          : null,
+      excerpts: [],
+    };
+    output.results.push(source);
+
+    if (encoder.encode(JSON.stringify(output)).byteLength > MAX_OUTPUT_BYTES) {
+      output.results.pop();
+      output.truncated = true;
+      break;
+    }
+
+    sourceExcerpts.push(item!.excerpts);
+  }
+
+  for (const [index, source] of output.results.entries()) {
+    const excerpts = sourceExcerpts[index];
+    if (!Array.isArray(excerpts)) continue;
+
+    for (const excerpt of excerpts) {
+      if (typeof excerpt !== 'string') {
+        output.truncated = true;
+        continue;
+      }
+
+      const characters = Array.from(excerpt);
+      source.excerpts.push(
+        characters.slice(0, MAX_EXCERPT_CHARACTERS).join('')
+      );
+      if (characters.length > MAX_EXCERPT_CHARACTERS) output.truncated = true;
+      if (
+        encoder.encode(JSON.stringify(output)).byteLength > MAX_OUTPUT_BYTES
+      ) {
+        source.excerpts.pop();
+        output.truncated = true;
+        break;
+      }
+    }
+  }
+
+  return output;
+}
+
+function createTransport(document: Document) {
+  let sessionId: string | undefined;
+
+  return async (
+    tool: 'web_search' | 'web_fetch',
+    args: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<Output> => {
+    if (!sessionId) {
+      try {
+        const storage = document.defaultView?.sessionStorage;
+        sessionId = storage?.getItem(SESSION_KEY) || crypto.randomUUID();
+        storage?.setItem(SESSION_KEY, sessionId);
+      } catch {
+        sessionId ??= crypto.randomUUID();
+      }
+    }
+
+    let response: Response;
+
+    try {
+      response = await fetch(ENDPOINT, {
+        method: 'POST',
+        credentials: 'omit',
+        redirect: 'error',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'Mcp-Session-Id': sessionId,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: tool,
+            arguments: { ...args, session_id: sessionId },
+          },
+        }),
+        ...(signal ? { signal } : {}),
+      });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      throw new Error(
+        'Parallel Search is unavailable. Check your network and connect-src policy.'
+      );
+    }
+
+    if (response.status === 429) {
+      throw new Error(
+        'Parallel Search reached its free rate limit. Try again later.'
+      );
+    }
+    if (!response.ok) {
+      throw new Error(`Parallel Search returned HTTP ${response.status}.`);
+    }
+
+    let message: {
+      error?: unknown;
+      result?: {
+        isError?: boolean;
+        structuredContent?: unknown;
+        content?: Array<{ type?: unknown; text?: unknown }>;
+      };
+    };
+
+    try {
+      message = (await response.json()) as typeof message;
+    } catch {
+      throw new Error('Parallel Search returned an unexpected response.');
+    }
+
+    if (message.error || message.result?.isError || !message.result) {
+      throw new Error('Parallel Search could not complete the request.');
+    }
+
+    if (message.result.structuredContent !== undefined) {
+      return normalizeOutput(message.result.structuredContent);
+    }
+
+    try {
+      const text = message.result.content?.find(
+        (item) => item.type === 'text'
+      )?.text;
+      if (typeof text !== 'string') throw new Error();
+      return normalizeOutput(JSON.parse(text) as unknown);
+    } catch {
+      throw new Error('Parallel Search returned an unexpected response.');
+    }
+  };
 }
 
 function createTools(document: Document): WebMcpTool[] {
@@ -44,12 +226,6 @@ function createTools(document: Document): WebMcpTool[] {
         type: 'object',
         properties: {
           objective: { type: 'string', minLength: 1, maxLength: 500 },
-          search_queries: {
-            type: 'array',
-            minItems: 1,
-            maxItems: 3,
-            items: { type: 'string', minLength: 1, maxLength: 100 },
-          },
         },
         required: ['objective'],
         additionalProperties: false,
@@ -57,25 +233,9 @@ function createTools(document: Document): WebMcpTool[] {
       annotations,
       execute(input, options) {
         const objective = requiredString(input.objective, 'objective', 500);
-        let searchQueries = [objective.slice(0, 100)];
-
-        if (input.search_queries !== undefined) {
-          if (
-            !Array.isArray(input.search_queries) ||
-            input.search_queries.length < 1 ||
-            input.search_queries.length > 3
-          ) {
-            throw new Error('search_queries must contain 1 to 3 queries.');
-          }
-
-          searchQueries = input.search_queries.map((query) =>
-            requiredString(query, 'search query', 100)
-          );
-        }
-
         return transport(
           'web_search',
-          { objective, search_queries: searchQueries },
+          { objective, search_queries: [objective.slice(0, 100)] },
           options?.signal
         );
       },
@@ -138,32 +298,19 @@ export async function installParallelWebMcp(): Promise<boolean> {
   const existing = installations.get(currentDocument);
   if (existing) return existing;
 
-  const installation = (async () => {
-    const registration = new AbortController();
-    const registered: string[] = [];
-
-    try {
-      for (const tool of createTools(currentDocument)) {
-        await context.registerTool(tool, { signal: registration.signal });
-        registered.push(tool.name);
-      }
-
-      return true;
-    } catch (error) {
+  const registration = new AbortController();
+  const installation = Promise.all(
+    createTools(currentDocument).map((tool) =>
+      context.registerTool(tool, { signal: registration.signal })
+    )
+  ).then(
+    () => true,
+    (error: unknown) => {
       registration.abort();
-      for (const name of registered) {
-        try {
-          context.unregisterTool?.(name);
-        } catch {
-          // Abort-capable browsers may already have removed this tool.
-        }
-      }
+      installations.delete(currentDocument);
       throw error;
     }
-  })().catch((error: unknown) => {
-    installations.delete(currentDocument);
-    throw error;
-  });
+  );
 
   installations.set(currentDocument, installation);
   return installation;

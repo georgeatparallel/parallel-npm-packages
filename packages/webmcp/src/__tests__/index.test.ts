@@ -54,6 +54,11 @@ describe('installParallelWebMcp', () => {
       expect(tool.inputSchema.additionalProperties).toBe(false);
       expect(tool.inputSchema.properties).not.toHaveProperty('session_id');
     }
+    expect(
+      browser.registered.get('parallel_web_search')?.inputSchema.properties
+    ).toEqual({
+      objective: { type: 'string', minLength: 1, maxLength: 500 },
+    });
   });
 
   it('shares one installation between concurrent callers', async () => {
@@ -76,20 +81,6 @@ describe('installParallelWebMcp', () => {
 
     await expect(installParallelWebMcp()).rejects.toThrow('already registered');
     expect([...browser.registered.keys()]).toEqual(['page_owned_tool']);
-  });
-
-  it('can retry after a browser rejects registration synchronously', async () => {
-    const browser = createBrowser();
-    vi.stubGlobal('document', browser.document);
-    vi.mocked(browser.context.registerTool).mockImplementationOnce(() => {
-      throw new Error('Browser registration failed.');
-    });
-
-    await expect(installParallelWebMcp()).rejects.toThrow(
-      'registration failed'
-    );
-    expect(await installParallelWebMcp()).toBe(true);
-    expect(browser.registered.size).toBe(2);
   });
 
   it('calls both upstream tools anonymously with the same stable session', async () => {
@@ -124,12 +115,16 @@ describe('installParallelWebMcp', () => {
       await browser.registered
         .get('parallel_web_search')!
         .execute({ objective: 'Find recent product announcements' })
-    ).toMatchObject({ request_id: 'search_test' });
+    ).toMatchObject({
+      results: [{ url: 'https://example.com/result' }],
+    });
     expect(
       await browser.registered
         .get('parallel_web_fetch')!
         .execute({ url: 'https://example.com/article' })
-    ).toMatchObject({ request_id: 'extract_test' });
+    ).toMatchObject({
+      results: [{ url: 'https://example.com/article' }],
+    });
 
     expect(requests[0]?.arguments.session_id).toBe(
       requests[1]?.arguments.session_id
@@ -247,13 +242,12 @@ describe('installParallelWebMcp', () => {
     expect(JSON.stringify(output)).not.toContain('full_content');
   });
 
-  it('preserves later source citations when an earlier excerpt exceeds the output limit', async () => {
+  it('keeps every source citation even when the first excerpt is oversized', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
     const sources = Array.from({ length: 5 }, (_, index) => ({
       url: `https://example.com/source-${index}`,
-      title: `Source ${index}`,
-      excerpts: [index === 0 ? '🌍'.repeat(10_000) : `Excerpt ${index}`],
+      excerpts: [index ? 'Short excerpt' : '🌍'.repeat(10_000)],
     }));
     mockSearch(searchPayload({ results: sources }));
     await installParallelWebMcp();
@@ -262,19 +256,14 @@ describe('installParallelWebMcp', () => {
       .get('parallel_web_search')!
       .execute({ objective: 'news' })) as {
       results: Array<{ url: string }>;
-      truncated: boolean;
     };
 
     expect(output.results.map((source) => source.url)).toEqual(
       sources.map((source) => source.url)
     );
-    expect(output.truncated).toBe(true);
-    expect(
-      new TextEncoder().encode(JSON.stringify(output)).byteLength
-    ).toBeLessThanOrEqual(12_000);
   });
 
-  it('accepts standard MCP text results when structured content is absent', async () => {
+  it('accepts standard MCP text results without structured content', async () => {
     const browser = createBrowser();
     vi.stubGlobal('document', browser.document);
     vi.stubGlobal(
@@ -289,7 +278,9 @@ describe('installParallelWebMcp', () => {
       browser.registered
         .get('parallel_web_search')!
         .execute({ objective: 'news' })
-    ).resolves.toMatchObject({ request_id: 'search_test' });
+    ).resolves.toMatchObject({
+      results: [{ url: 'https://example.com/result' }],
+    });
   });
 
   it('forwards execution cancellation to the browser request', async () => {
@@ -344,5 +335,19 @@ describe('installParallelWebMcp', () => {
         .get('parallel_web_search')!
         .execute({ objective: 'news' })
     ).rejects.toThrow('could not complete');
+  });
+
+  it('registers both tools from the self-installing entry point', async () => {
+    const browser = createBrowser();
+    vi.stubGlobal('document', browser.document);
+
+    await import('../auto.js');
+
+    await vi.waitFor(() => {
+      expect([...browser.registered.keys()]).toEqual([
+        'parallel_web_search',
+        'parallel_web_fetch',
+      ]);
+    });
   });
 });

@@ -68,9 +68,6 @@ npm view @parallel-web/dsh-web-search dist-tags --json
 
 The npm owner should inspect the tarball listing before the publish and complete npm's 2FA prompt.
 The explicit `--tag rc` is required: npm otherwise assigns even a prerelease version to `latest`.
-For a first-time `@parallel-web/webmcp` release, run the same bootstrap flow with
-`packages/webmcp`, then verify `npm view @parallel-web/webmcp dist-tags --json` before
-sharing the package. An RC must not remain on the `latest` dist-tag.
 The bootstrap intentionally has no git tag or GitHub Release. After it succeeds, configure the
 package's trusted publisher for:
 

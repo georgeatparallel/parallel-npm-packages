@@ -15,7 +15,6 @@ interface TestContext {
     tool: TestTool,
     options?: { signal?: AbortSignal }
   ): Promise<void>;
-  unregisterTool?(name: string): void;
 }
 
 export interface TestBrowser {
@@ -51,9 +50,6 @@ export function createBrowser(
         { once: true }
       );
     }),
-    unregisterTool: vi.fn((name) => {
-      registered.delete(name);
-    }),
   };
 
   const sessionStorage = {
@@ -80,7 +76,7 @@ export function createBrowser(
 export function upstreamResponse(
   id: number,
   payload: Record<string, unknown>,
-  options: { structured?: boolean; isError?: boolean } = {}
+  options: { structured?: boolean } = {}
 ): Response {
   return Response.json({
     jsonrpc: '2.0',
@@ -88,7 +84,6 @@ export function upstreamResponse(
     result: {
       ...(options.structured === false ? {} : { structuredContent: payload }),
       content: [{ type: 'text', text: JSON.stringify(payload) }],
-      ...(options.isError ? { isError: true } : {}),
     },
   });
 }
@@ -111,9 +106,7 @@ export function searchPayload(
   };
 }
 
-export function fetchPayload(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+export function fetchPayload(): Record<string, unknown> {
   return {
     extract_id: 'extract_test',
     results: [
@@ -125,7 +118,5 @@ export function fetchPayload(
         full_content: 'This should never be returned.',
       },
     ],
-    errors: [],
-    ...overrides,
   };
 }
