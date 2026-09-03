@@ -56,7 +56,7 @@ describe('parallel-auth', () => {
     } = await import('../parallel-auth.js'));
   });
 
-  it('registers a Parallel provider that serves no models', () => {
+  it('registers the shared credential provider without research models', () => {
     const provider = registerProvider();
 
     expect(provider.id).toBe('parallel');
