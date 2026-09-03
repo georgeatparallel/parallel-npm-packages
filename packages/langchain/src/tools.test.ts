@@ -416,6 +416,61 @@ describe('validation before dispatch', () => {
 });
 
 describe('bounded model content and complete artifacts', () => {
+  it.each(['excerpts', 'full content', 'error URL'] as const)(
+    'keeps extraction failures visible when %s exceeds the text budget',
+    async (oversized) => {
+      const response = {
+        ...extractResponse,
+        results:
+          oversized === 'error URL'
+            ? []
+            : [
+                {
+                  ...extractResponse.results[0],
+                  excerpts: oversized === 'excerpts' ? ['x'.repeat(1024)] : [],
+                  full_content: 'x'.repeat(1024),
+                },
+              ],
+        errors: [
+          {
+            ...extractResponse.errors[0],
+            url:
+              oversized === 'error URL'
+                ? `https://oversize.example.com/${'x'.repeat(2000)}`
+                : extractResponse.errors[0].url,
+          },
+        ],
+        warnings: [],
+      };
+      const { client } = fixtureClient(response);
+      const extract = createExtractTool({
+        client,
+        fullContent: true,
+        maxOutputChars: 1024,
+      });
+      const args = {
+        urls: [...response.results, ...response.errors].map(({ url }) => url),
+      };
+      const message = await extract.invoke({
+        type: 'tool_call',
+        id: 'call_truncated_failure',
+        name: extract.name,
+        args,
+      });
+      const content = String(message.content);
+      expect(content).toMatch(/extraction failed/i);
+      expect(content.length).toBeLessThanOrEqual(1024);
+      expect(content).toMatch(/truncat/i);
+      expect(message.artifact).toStrictEqual(response);
+      expect(await extract.invoke(args)).toBe(content);
+      if (response.results.length) {
+        expect(content).toContain(response.results[0].url);
+      } else {
+        expect(content).not.toContain('https://oversize.example.com/');
+      }
+    }
+  );
+
   it('bounds large titles and excerpts while retaining all source metadata', async () => {
     const response = {
       ...searchResponse,

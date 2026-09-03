@@ -42,7 +42,11 @@ export function formatResponse(
   // Reserve the notice before appending sections so even pathological metadata
   // cannot exceed the cap. A source header must fit in full before any excerpt.
   const budget = maxOutputChars - TRUNCATED.length;
-  let content = '';
+  // Keep failures visible even when a result or error URL consumes the budget.
+  let content =
+    'errors' in response && response.errors.length
+      ? `Extraction failed for ${response.errors.length} of ${response.results.length + response.errors.length} URLs.`
+      : '';
   for (const section of sections) {
     const header = `${content ? '\n\n' : ''}${section.source}`;
     if (content.length + header.length > budget) {

@@ -148,7 +148,8 @@ requests. LangChain runnable timeouts also reach the SDK through their signal.
 Authentication, rate-limit, timeout, and other SDK errors reject the invocation;
 they are not converted into successful text. Extract can return a successful
 HTTP response with failures for individual URLs. Those failures are summarized
-in the text and preserved in `artifact.errors`.
+in the text and preserved in `artifact.errors`. A failure count stays visible
+even when the text limit omits individual error details.
 
 The tools use authenticated Search and Extract. They do not use anonymous
 Search MCP or change your account's access, limits, or billing. Search and
