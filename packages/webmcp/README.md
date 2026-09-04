@@ -84,7 +84,10 @@ the [Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp) and the
   excerpts. Destination safety belongs to the existing Search MCP service.
 - Page content, cookies, signed-in user data, and agent history are never
   collected automatically.
-- Requests support cancellation and do not automatically retry rate limits.
+- Requests do not automatically retry rate limits. Network cancellation depends
+  on the browser supplying an execution signal, which the adapter forwards to
+  `fetch()`. [Chrome 152 does not yet supply that signal](https://chromium.googlesource.com/chromium/src/+/refs/tags/152.0.7977.76/third_party/blink/renderer/core/script_tools/model_context_tool.idl),
+  so cancelling a tool call there does not stop its in-flight request.
 
 Sites with a Content Security Policy must allow the endpoint:
 
