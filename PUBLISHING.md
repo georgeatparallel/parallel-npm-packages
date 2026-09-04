@@ -1,7 +1,6 @@
 # Publishing Guide
 
-This monorepo tracks six publishable npm packages, each versioned, tagged, and released
-**independently**:
+We version, tag, and release these six packages separately:
 
 - `@parallel-web/ai-sdk-tools` — `packages/ai-sdk-tools`
 - `@parallel-web/dsh-responses-subagent` — `packages/dsh-responses-subagent`
@@ -10,9 +9,9 @@ This monorepo tracks six publishable npm packages, each versioned, tagged, and r
 - `@parallel-web/pi-extension` — `packages/pi-extension`
 - `@parallel-web/webmcp` — `packages/webmcp`
 
-`@parallel-web/dsh-responses-subagent` and `@parallel-web/webmcp` have not yet been published.
-They can be installed only from a local tarball until an npm organization owner completes
-each reviewed first release.
+`@parallel-web/dsh-responses-subagent` and `@parallel-web/webmcp` aren't on npm yet.
+Use a local tarball to try them until an npm organization owner publishes each
+package's reviewed first release.
 
 (`@parallel-web/oauth` in `packages/parallel-oauth` is `private` — it is bundled into the
 OpenCode plugin and Pi extension at build time and is never published.)
@@ -58,10 +57,12 @@ Skipping that upgrade causes a misleading `404 Not Found` on the publish `PUT`.
 
 ### First release of a new package
 
-npm requires a package to exist before its trusted publisher can be configured. Adding a package
-to this repository intentionally does not publish it. An npm organization owner must first publish
-the reviewed bootstrap release manually from a clean, updated `main` checkout. Set `PACKAGE` to
-the new package's directory name, such as `webmcp` or `dsh-responses-subagent`:
+npm needs a package to exist before you can set up its trusted publisher. That means
+an npm organization owner needs to publish the reviewed first release manually.
+Merging a new package into this repo won't publish it.
+
+Start from a clean, up-to-date `main` checkout. Set `PACKAGE` to the directory name
+of the package you're publishing, such as `webmcp` or `dsh-responses-subagent`:
 
 ```bash
 PACKAGE=webmcp

@@ -1,7 +1,7 @@
 {
   "name": "@parallel-web/webmcp",
   "version": "0.1.0-rc.0",
-  "description": "Free browser-native Parallel web search and fetch tools for WebMCP-enabled websites",
+  "description": "Let agents visiting your website search the web and read pages with Parallel through WebMCP",
   "author": "Parallel Web",
   "license": "MIT",
   "type": "module",

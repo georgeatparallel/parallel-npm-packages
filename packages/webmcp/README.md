@@ -1,20 +1,24 @@
 # Parallel WebMCP
 
-Give agents visiting your website free access to Parallel's public-web search
-and webpage extraction tools. The package registers `parallel_web_search` and
-`parallel_web_fetch` with the browser's WebMCP API and forwards calls to the
-existing [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp).
-It has no runtime dependencies, API keys, or additional servers.
+Let agents visiting your site search the web and read pages with Parallel.
+Add this package to your site's browser code, and compatible agents can call
+`parallel_web_search` and `parallel_web_fetch` while your page is open.
+
+Both tools use the existing free
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp)
+and return excerpts with source URLs. You don't need an API key or a backend,
+and your visitors don't need to configure an MCP server. The package has no
+runtime dependencies.
 
 ## Install
 
-Once the package has been published:
+After the first npm release, install it with:
 
 ```bash
 npm install @parallel-web/webmcp@rc
 ```
 
-Call the installer once from your application's browser entry point:
+Add this to your site's browser entry point:
 
 ```ts
 import { installParallelWebMcp } from '@parallel-web/webmcp';
@@ -22,13 +26,13 @@ import { installParallelWebMcp } from '@parallel-web/webmcp';
 await installParallelWebMcp();
 ```
 
-The installer returns `true` when the tools are available and `false` when the
-browser does not support WebMCP. Repeated calls are harmless, server-side
-rendering is safe, and unsupported browsers make no network requests. Tools are
-automatically removed when the page closes or navigates away.
+The installer returns `true` once both tools are registered. If the browser
+doesn't support WebMCP, it returns `false` without making a network request.
+It's safe to call during server-side rendering, and calling it again won't
+register duplicate tools. The browser removes the tools when the page closes
+or navigates away.
 
-To share tools with an agent running on a different origin, explicitly allow its
-trusted origin when installing:
+If an agent runs on another origin, list the origins you trust:
 
 ```ts
 await installParallelWebMcp({
@@ -36,13 +40,13 @@ await installParallelWebMcp({
 });
 ```
 
-The agent must also request your site's origin through
+The agent also needs to include your site in its discovery call:
 `document.modelContext.getTools({ fromOrigins: ['https://your-site.example'] })`.
-Cross-origin access is disabled by default. Use the configurable installer above
-instead of the self-installing script when cross-origin agents need access.
+Cross-origin access is off by default. Use the installer above when you need it,
+since the script tag below doesn't accept options.
 
-After publication, sites can also load a version-pinned, self-installing module
-from an npm CDN:
+After publication, you can also use this script tag. It pins the package version
+and registers the tools automatically:
 
 ```html
 <script
@@ -54,50 +58,53 @@ from an npm CDN:
 
 ## Browser requirements
 
-WebMCP is a proposed browser standard, so agents need a browser that exposes
-`document.modelContext.registerTool` when they visit your page.
+WebMCP is still a proposed browser standard. Your visitors need a browser that
+exposes `document.modelContext.registerTool`.
 
-For a production website:
+For a live site using Chrome:
 
 - Use Chrome 149 or later and enroll your site's origin in the
   [WebMCP origin trial](https://developer.chrome.com/origintrials/#/register_trial/4163014905550602241).
-- Serve the page over HTTPS and keep it origin-isolated. Do not opt out with
+- Serve the page over HTTPS and keep origin isolation enabled. Don't opt out with
   `Origin-Agent-Cluster: ?0`.
 - Register tools in the top-level document or a same-origin iframe. A
-  cross-origin iframe also requires
-  `<iframe src="https://example.com" allow="tools"></iframe>` for registration;
-  discovering its tools from another origin additionally requires `exposedTo`.
+  cross-origin iframe needs `allow="tools"`, for example:
+  `<iframe src="https://example.com" allow="tools"></iframe>`.
+  Sharing its tools with another origin also requires `exposedTo`.
 
-For local development only, enable `chrome://flags/#enable-webmcp-testing` and
-restart Chrome. The flag does not enable WebMCP for your site's visitors. See
-the [Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp) and the
+For local testing, enable `chrome://flags/#enable-webmcp-testing` and restart
+Chrome. This only enables WebMCP in your own browser. For the full setup, see the
+[Chrome WebMCP guide](https://developer.chrome.com/docs/ai/webmcp) and the
 [WebMCP specification](https://webmachinelearning.github.io/webmcp/).
 
 ## Security and privacy
 
-- Both tools are marked read-only and identify retrieved content as untrusted.
-- Search terms, requested URLs, and an anonymous per-tab session ID are sent to
-  `https://search.parallel.ai/mcp`. The referrer includes only your site's
-  origin, not its path or query string. URL fragments and browser credentials are
-  never sent.
-- The browser adapter accepts only HTTP and HTTPS URLs and returns size-limited
-  excerpts. Destination safety belongs to the existing Search MCP service.
-- Page content, cookies, signed-in user data, and agent history are never
-  collected automatically.
-- Requests do not automatically retry rate limits. Network cancellation depends
-  on the browser supplying an execution signal, which the adapter forwards to
-  `fetch()`. [Chrome 152 does not yet supply that signal](https://chromium.googlesource.com/chromium/src/+/refs/tags/152.0.7977.76/third_party/blink/renderer/core/script_tools/model_context_tool.idl),
-  so cancelling a tool call there does not stop its in-flight request.
+- Both tools are marked read-only. Results are marked as untrusted because they
+  come from third-party webpages.
+- Requests send the search terms or requested URL to
+  `https://search.parallel.ai/mcp`, along with an anonymous session ID for the
+  tab. The referrer contains only your site's origin. The package strips URL
+  fragments and leaves out browser credentials.
+- Fetch accepts only HTTP and HTTPS URLs. The Search MCP service handles
+  destination safety, and the package limits the excerpts returned to the agent.
+- The package doesn't automatically collect page content, cookies, signed-in
+  user data, or agent history.
+- If a request hits the free rate limit, it fails without retrying automatically.
 
-Sites with a Content Security Policy must allow the endpoint:
+When the browser supplies a cancellation signal, the package passes it to
+`fetch()` so the request can stop.
+[Chrome 152 doesn't yet supply that signal](https://chromium.googlesource.com/chromium/src/+/refs/tags/152.0.7977.76/third_party/blink/renderer/core/script_tools/model_context_tool.idl),
+so cancelling a tool call there won't stop its network request.
+
+If your site uses a Content Security Policy, allow the Search MCP endpoint:
 
 ```text
 connect-src https://search.parallel.ai
 ```
 
-The optional CDN script also requires its origin in `script-src`. Never put a
-Parallel API key in browser code. Paid usage should go through your own
-authenticated server, which keeps its credentials private.
+If you use the CDN script, allow its origin in `script-src` too. Keep Parallel
+API keys out of browser code. For paid usage, send requests through your own
+authenticated server so the key stays private.
 
 ## Development
 
