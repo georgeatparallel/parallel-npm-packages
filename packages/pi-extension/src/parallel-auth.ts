@@ -22,13 +22,12 @@ async function loginToParallel(
   interaction.signal.throwIfAborted();
 
   const { apiKey } = await runParallelOAuth({
-    onAuthUrl: (url, browserOpened) => {
+    openBrowser: false,
+    onAuthUrl: (url) => {
       interaction.notify({
         type: 'auth_url',
         url,
-        instructions: browserOpened
-          ? 'Opening Parallel login in your browser.'
-          : 'Open this URL to sign in to Parallel.',
+        instructions: 'Opening Parallel login in your browser.',
       });
     },
     promptForCallback: async (authUrl) => {
@@ -71,10 +70,8 @@ async function resolveParallelAuth(input: {
 }
 
 /**
- * A provider that exists purely to carry Parallel's credential. Pi owns the
- * storage (auth.json), the `/login parallel` and `/logout parallel` flows, and
- * the `PARALLEL_API_KEY` fallback; the extension only reads the resolved key.
- * It serves no models, so the stream entry points are never reached.
+ * This provider only carries credentials. Pi owns auth.json, the login/logout
+ * flows and environment fallback; every web tool reuses the resolved key.
  */
 function createParallelProvider(): Provider {
   return {

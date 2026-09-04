@@ -105,10 +105,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --filter @parallel-web/dsh-web-search... --frozen-lockfile
+        run: pnpm install --filter @parallel-web/dsh-web-search... --filter @parallel-web/dsh-responses-subagent... --frozen-lockfile
 
       - name: Run deterministic plugin checks
-        run: pnpm --filter @parallel-web/dsh-web-search check
+        run: pnpm --filter @parallel-web/dsh-web-search --filter @parallel-web/dsh-responses-subagent run check
 
       - name: Verify packed DSH profile lifecycle
         shell: bash
@@ -133,6 +133,47 @@ jobs:
           node packages/dsh-web-search/scripts/verify-packed-profile.mjs \
             --dsh-home "$dsh_home" \
             --expected-version "$version"
+
+          pnpm --dir packages/dsh-responses-subagent pack --pack-destination "$pack_dir"
+          responses_artifact="$(find "$pack_dir" -name '*dsh-responses-subagent*.tgz' -print -quit)"
+          tar -xOzf "$responses_artifact" package/package.json | node -e '
+            const manifest = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            if (manifest.private || manifest.publishConfig?.access !== "public" ||
+                manifest.dsh?.bundle?.patch !== "./cordis.patch.yml") {
+              throw new Error("invalid packed Responses plugin manifest");
+            }
+          '
+          DSH_HOME="$dsh_home" pnpm --dir packages/dsh-web-search exec dsh \
+            plugin --profile web add "$responses_artifact"
+          DSH_HOME="$dsh_home" pnpm --dir packages/dsh-web-search exec dsh \
+            --profile web --dump-config > "$dsh_home/combined.yml"
+          grep -Fq 'id: subagent-parallel-responses' "$dsh_home/combined.yml"
+          grep -Fq 'toolName: parallel_research' "$dsh_home/combined.yml"
+          grep -Fq 'id: web-search-parallel' "$dsh_home/combined.yml"
+
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { createRequire } from "node:module";
+            import { join } from "node:path";
+
+            const require = createRequire(join(process.argv[1], "profiles/web/package.json"));
+            const plugin = await import(require.resolve("@parallel-web/dsh-responses-subagent"));
+            const { Context } = await import(require.resolve("@deepseek-ai/cordis"));
+            const subagents = await import(require.resolve("@deepseek-ai/dsh-subagent"));
+            const context = new Context();
+            context.provide("systemPrompt", { section() {} });
+            await context.plugin(subagents.default);
+            await context.plugin(plugin, { apiKey: "parallel_test_packed_profile" });
+            assert.equal(plugin.Config.dict.apiKey.meta.role, "secret");
+            assert.equal(context.subagents.getProvider("parallel-responses")?.inheritsParentContext, false);
+          ' "$dsh_home"
+
+          DSH_HOME="$dsh_home" pnpm --dir packages/dsh-web-search exec dsh \
+            plugin --profile web remove @parallel-web/dsh-responses-subagent
+          DSH_HOME="$dsh_home" pnpm --dir packages/dsh-web-search exec dsh \
+            --profile web --dump-config > "$dsh_home/responses-removed.yml"
+          cmp "$dsh_home/after.yml" "$dsh_home/responses-removed.yml"
+
           DSH_HOME="$dsh_home" pnpm --dir packages/dsh-web-search exec dsh \
             plugin --profile web remove @parallel-web/dsh-web-search
           DSH_HOME="$dsh_home" pnpm --dir packages/dsh-web-search exec dsh \

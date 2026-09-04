@@ -71,6 +71,48 @@ describe('Parallel plugin config', () => {
 });
 
 describe('Parallel plugin registration', () => {
+  it.each(['', 'parallel_test_plugin'])(
+    'reuses a session per provider with API key %j',
+    async (apiKey) => {
+      const sessionIds: string[] = [];
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+        const body = JSON.parse(init?.body as string);
+        const sessionId =
+          apiKey === '' ? body.params.arguments.session_id : body.session_id;
+        sessionIds.push(sessionId);
+        const result = { results: [], session_id: sessionId };
+        return new Response(
+          JSON.stringify(
+            apiKey === ''
+              ? { jsonrpc: '2.0', id: 1, result: { structuredContent: result } }
+              : result
+          ),
+          { headers: { 'content-type': 'application/json' } }
+        );
+      });
+      const ctx = new Context();
+      await ctx.plugin(WebRuntime, { searchProvider: 'parallel' });
+      const fiber = await ctx.plugin(parallelPlugin, { apiKey });
+      try {
+        await ctx.web.search({ query: 'first query' });
+        await ctx.web.search({ query: 'second query' });
+        expect(sessionIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+        expect(sessionIds[1]).toBe(sessionIds[0]);
+      } finally {
+        await fiber.dispose();
+      }
+
+      const next = await ctx.plugin(parallelPlugin, { apiKey });
+      try {
+        await ctx.web.search({ query: 'new provider' });
+        expect(sessionIds[2]).toMatch(/^[0-9a-f-]{36}$/);
+        expect(sessionIds[2]).not.toBe(sessionIds[0]);
+      } finally {
+        await next.dispose();
+      }
+    }
+  );
+
   it('registers, selects, and disposes through the real WebRuntime', async () => {
     mockSearch();
     const ctx = new Context();
@@ -106,8 +148,17 @@ describe('Parallel plugin registration', () => {
     expect(search).toHaveBeenCalledOnce();
   });
 
-  it('lets an explicit empty key suppress environment fallback', async () => {
+  it('lets an explicit empty key choose free search over an environment key', async () => {
     const search = mockSearch();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { structuredContent: { results: [] } },
+        })
+      )
+    );
     const ctx = new Context();
     ctx.provide(
       'launchEnvironment',
@@ -120,21 +171,48 @@ describe('Parallel plugin registration', () => {
     );
     await ctx.plugin(WebRuntime, { searchProvider: 'parallel' });
     await ctx.plugin(parallelPlugin, { apiKey: '' });
-    await expect(ctx.web.search({ query: 'q' })).rejects.toMatchObject({
-      code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE',
+    await expect(ctx.web.search({ query: 'q' })).resolves.toEqual({
+      sources: [],
+      truncated: false,
     });
+    expect(fetch).toHaveBeenCalledOnce();
     expect(search).not.toHaveBeenCalled();
   });
 
-  it('is unavailable without a key and makes no network call', async () => {
+  it('uses free MCP search when no API key is configured', async () => {
     const search = mockSearch();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            structuredContent: {
+              results: [
+                {
+                  url: 'https://example.test',
+                  excerpts: ['Free search works'],
+                },
+              ],
+            },
+          },
+        })
+      )
+    );
     const ctx = new Context();
     ctx.provide('launchEnvironment', createLaunchEnvironmentSnapshot([]));
     await ctx.plugin(WebRuntime, { searchProvider: 'parallel' });
     await ctx.plugin(parallelPlugin, {});
-    await expect(ctx.web.search({ query: 'q' })).rejects.toMatchObject({
-      code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE',
+    await expect(ctx.web.search({ query: 'q' })).resolves.toEqual({
+      sources: [
+        {
+          url: 'https://example.test',
+          snippet: 'Free search works',
+        },
+      ],
+      truncated: false,
     });
+    expect(fetch).toHaveBeenCalledOnce();
     expect(search).not.toHaveBeenCalled();
   });
 

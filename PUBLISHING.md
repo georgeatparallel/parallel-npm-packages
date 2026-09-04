@@ -1,12 +1,18 @@
 # Publishing Guide
 
-This monorepo publishes five npm packages, each versioned, tagged, and released **independently**:
+This monorepo tracks six publishable npm packages, each versioned, tagged, and released
+**independently**:
 
 - `@parallel-web/ai-sdk-tools` — `packages/ai-sdk-tools`
+- `@parallel-web/dsh-responses-subagent` — `packages/dsh-responses-subagent`
 - `@parallel-web/dsh-web-search` — `packages/dsh-web-search`
 - `@parallel-web/opencode-plugin` — `packages/opencode-plugin`
 - `@parallel-web/pi-extension` — `packages/pi-extension`
 - `@parallel-web/webmcp` — `packages/webmcp`
+
+`@parallel-web/dsh-responses-subagent` and `@parallel-web/webmcp` have not yet been published.
+They can be installed only from a local tarball until an npm organization owner completes
+each reviewed first release.
 
 (`@parallel-web/oauth` in `packages/parallel-oauth` is `private` — it is bundled into the
 OpenCode plugin and Pi extension at build time and is never published.)
@@ -55,7 +61,7 @@ Skipping that upgrade causes a misleading `404 Not Found` on the publish `PUT`.
 npm requires a package to exist before its trusted publisher can be configured. Adding a package
 to this repository intentionally does not publish it. An npm organization owner must first publish
 the reviewed bootstrap release manually from a clean, updated `main` checkout. Set `PACKAGE` to
-the new package's directory name, such as `webmcp` or `dsh-web-search`:
+the new package's directory name, such as `webmcp` or `dsh-responses-subagent`:
 
 ```bash
 PACKAGE=webmcp

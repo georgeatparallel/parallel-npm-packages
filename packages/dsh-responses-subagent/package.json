@@ -1,0 +1,77 @@
+{
+  "name": "@parallel-web/dsh-responses-subagent",
+  "description": "Parallel Responses research subagent for DeepSeek Harness",
+  "version": "0.1.0-rc.0",
+  "author": "Parallel Web",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/index.d.ts",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parallel-web/parallel-npm-packages.git",
+    "directory": "packages/dsh-responses-subagent"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "parallel-responses",
+    "research-agent"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
+    "clean": "rm -rf lib",
+    "lint": "oxlint src tests tsdown.config.ts",
+    "prepare": "pnpm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-launch-environment": "^0.1.0-rc.6 || ^0.1.1-rc.2",
+    "@deepseek-ai/dsh-session": "^0.1.0-rc.6 || ^0.1.1-rc.2",
+    "@deepseek-ai/dsh-subagent": "^0.1.0-rc.6 || ^0.1.1-rc.2",
+    "@deepseek-ai/dsh-tool-subagent": "^0.1.0-rc.6 || ^0.1.1-rc.2"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-launch-environment": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subagent": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tool-subagent": "0.1.0-rc.6",
+    "@types/node": "26.2.0",
+    "oxlint": "1.76.0",
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
+  }
+}
