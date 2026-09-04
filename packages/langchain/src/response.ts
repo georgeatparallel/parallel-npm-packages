@@ -7,8 +7,8 @@ const TRUNCATED =
   '\n\n[Output truncated. The complete response is available in the tool artifact.]';
 
 /**
- * Only model-facing text is reduced. Never mutate the SDK response, which is
- * retained as the artifact, or cut a source URL away from its displayed text.
+ * Shorten the text sent to the model, keeping the SDK response intact for the
+ * artifact. Always show a complete source URL before any text from that source.
  */
 export function formatResponse(
   response: SearchResult | ExtractResponse,
@@ -39,10 +39,9 @@ export function formatResponse(
     sections.push({ source: 'Warning: ', text: warning.message });
   }
 
-  // Reserve the notice before appending sections so even pathological metadata
-  // cannot exceed the cap. A source header must fit in full before any excerpt.
+  // Leave room for the truncation notice. Each source header must fit in full.
   const budget = maxOutputChars - TRUNCATED.length;
-  // Keep failures visible even when a result or error URL consumes the budget.
+  // Keep failures visible when result text or an error URL fills the space.
   let content =
     'errors' in response && response.errors.length
       ? `Extraction failed for ${response.errors.length} of ${response.results.length + response.errors.length} URLs.`

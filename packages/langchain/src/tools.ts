@@ -20,29 +20,29 @@ type Authentication =
   | { client: Parallel; apiKey?: never };
 
 interface CommonOptions {
-  /** Total model-facing text limit, including metadata. Default 20,000; minimum 1,024. */
+  /** Maximum characters sent to the model, including metadata. Default 20,000; minimum 1,024. */
   maxOutputChars?: number;
-  /** Reuse one ID across tools/calls belonging to the same research task. */
+  /** Share one ID across calls for the same research task. */
   sessionId?: string;
-  /** Configure cache freshness and live fetching using the SDK's policy. */
+  /** Set cache freshness and live fetching with the SDK's policy. */
   fetchPolicy?: FetchPolicy;
 }
 
-/** Pass an API key (defaults to PARALLEL_API_KEY), or an existing SDK client. */
+/** Use PARALLEL_API_KEY by default, or pass an API key or SDK client. */
 export type CreateSearchToolOptions = Authentication &
   CommonOptions & {
-    /** GA search mode. Defaults to advanced. */
+    /** Search mode. Defaults to advanced. */
     mode?: NonNullable<SearchParams['mode']>;
     /** Maximum number of results, from 1 to 40. Defaults to 10. */
     maxResults?: number;
-    /** Restrict domains or freshness using the SDK's source policy. */
+    /** Set domain and freshness limits with the SDK's source policy. */
     sourcePolicy?: AdvancedSearchSettings['source_policy'];
   };
 
-/** Pass an API key (defaults to PARALLEL_API_KEY), or an existing SDK client. */
+/** Use PARALLEL_API_KEY by default, or pass an API key or SDK client. */
 export type CreateExtractToolOptions = Authentication &
   CommonOptions & {
-    /** Include full content in the artifact. Defaults to false; text prefers excerpts. */
+    /** Keep full pages in the artifact. Defaults to false; the text uses excerpts when available. */
     fullContent?: AdvancedExtractSettings['full_content'];
   };
 
@@ -101,8 +101,8 @@ function outputLimit(value = 20_000): number {
 }
 
 /**
- * Create a standard LangChain tool for the GA Search API. Plain invoke returns
- * bounded text; a ToolCall with an id returns a ToolMessage with the raw artifact.
+ * Create a LangChain Search tool. Plain calls return text. Calls with an ID
+ * return a ToolMessage that also includes the full response in its artifact.
  */
 export function createSearchTool(
   options: CreateSearchToolOptions = {}
@@ -148,7 +148,7 @@ export function createSearchTool(
   );
 }
 
-/** Create a standard LangChain tool for the GA Extract API with the same output contract as Search. */
+/** Create a LangChain Extract tool with the same text and artifact behavior as Search. */
 export function createExtractTool(
   options: CreateExtractToolOptions = {}
 ): StructuredToolInterface<typeof extractSchema> {

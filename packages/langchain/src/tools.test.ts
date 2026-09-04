@@ -72,8 +72,8 @@ const extractResponse: Parallel.ExtractResponse = {
   usage: [{ name: 'extract', count: 2 }],
 };
 
-// These are deterministic HTTP fixtures, not live API validation. The real SDK
-// still handles serialization, headers, response decoding, retries and errors.
+// Test responses let us exercise the real SDK without calling Parallel.
+// The SDK still handles requests, headers, response decoding, retries and errors.
 function fixtureClient(
   response: unknown,
   options: ClientOptions = {},

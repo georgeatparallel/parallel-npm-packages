@@ -5,8 +5,8 @@ import { createAgent } from 'langchain';
 import { Parallel } from 'parallel-web';
 
 /**
- * Run the example with a tool-calling LangChain model and an existing SDK client.
- * The returned agent state includes the final answer and raw tool artifacts.
+ * Run a research question with a LangChain model and a Parallel SDK client.
+ * The result includes the answer and the full tool responses.
  * @param {{ question: string, model: import('@langchain/core/language_models/chat_models').BaseChatModel, client: Parallel, signal?: AbortSignal }} options
  */
 export async function runResearch({ question, model, client, signal }) {

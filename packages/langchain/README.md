@@ -1,18 +1,17 @@
 # Parallel tools for LangChain
 
-Add Parallel Search and Extract to a LangChain JavaScript agent. The tools use
-the [Parallel SDK](https://github.com/parallel-web/parallel-sdk-typescript) and
-the GA Search and Extract APIs.
+Give your LangChain JavaScript agent two tools: Search to find sources and
+Extract to read them. Both use the
+[Parallel SDK](https://github.com/parallel-web/parallel-sdk-typescript) to call
+the Search and Extract APIs.
 
-This package is an unpublished release proposal. It is not an official
-`@langchain` package. You can run it from this repository or install a locally
-built tarball. The first npm release needs a Parallel npm organization owner,
-as described in the [publishing guide](../../PUBLISHING.md).
+`@parallel-web/langchain` isn't on npm yet. For now, you can run it from this
+repo or install a tarball you build locally.
 
-## Try it from source
+## Try it locally
 
-Use Node.js 22.13 or newer and the repository's pinned pnpm version. From the
-repository root:
+You'll need Node.js 22.13 or newer. These commands use the pnpm version pinned
+in this repo. Run them from the repo root:
 
 ```bash
 corepack pnpm install --frozen-lockfile
@@ -20,21 +19,21 @@ corepack pnpm --filter @parallel-web/langchain build
 corepack pnpm --filter @parallel-web/langchain test
 ```
 
-To use the package in another project, pack it from the repository root:
+To try it in another project, build a tarball:
 
 ```bash
 mkdir -p artifacts
 corepack pnpm --dir packages/langchain pack --pack-destination ../../artifacts
 ```
 
-Then install that tarball alongside `@langchain/core` in your application. The
-package supports `@langchain/core` 1.2.9 and later 1.x releases and provides ESM,
-CommonJS, and TypeScript declarations. No key is needed just to import it.
+Install that tarball alongside `@langchain/core` 1.2.9 or a later 1.x release.
+The package supports ESM, CommonJS, and TypeScript. Importing it doesn't need
+an API key.
 
-## Create the tools
+## Add the tools
 
-Set `PARALLEL_API_KEY` in your server environment. You can also pass `apiKey`
-directly. Do not ship your key in a browser bundle.
+Set `PARALLEL_API_KEY` on your server, or pass `apiKey` when you create a tool.
+Keep the key out of browser code.
 
 ```ts
 import { randomUUID } from 'node:crypto';
@@ -49,10 +48,10 @@ const search = createSearchTool({
 });
 const extract = createExtractTool({ maxOutputChars: 12_000, sessionId });
 
-// Pass these standard tools to your LangChain agent's tools array.
+// Add these to your LangChain agent's tools array.
 const tools = [search, extract];
 
-// Direct invocation returns text, useful outside an agent too.
+// You can also call a tool directly to get text back.
 const content = await search.invoke({
   search_queries: ['Parallel Search API documentation'],
   objective: 'Find the current Search API documentation and its search modes.',
@@ -60,21 +59,20 @@ const content = await search.invoke({
 console.log(content);
 ```
 
-Search is named `parallel_web_search`, and Extract is named `parallel_extract`,
+The tool names are `parallel_web_search` and `parallel_extract`,
 matching the [Python integration](https://github.com/parallel-web/langchain-parallel).
-There is no separate wrapper for LangGraph or a different agent product.
 
-Search takes `search_queries` with one to five nonblank strings of up to 200
-characters each. Extract takes `urls` with one to twenty HTTP or HTTPS URLs.
+Search accepts one to five nonblank `search_queries`, each up to 200 characters.
+Extract accepts one to twenty HTTP or HTTPS `urls`.
 Both accept an optional `objective` of up to 5,000 characters, or `null`.
-Validation happens before an API request. Credentials and request policy are
-not part of the model-visible tool schema.
+The tools check these inputs before making a request. Your app controls the
+credentials and request settings; the model doesn't see those in its tool schema.
 
-## Keep the complete response
+## Get the full response
 
-Both tools use LangChain's `content_and_artifact` response format. A normal
-`invoke(args)` returns only the bounded text. A tool call with an ID returns a
-`ToolMessage` whose `artifact` contains the complete SDK response:
+Calling `invoke(args)` returns text. If you pass a tool call with an ID, you
+get a `ToolMessage` with both the text and the full SDK response in `artifact`.
+This is LangChain's `content_and_artifact` format:
 
 ```ts
 const message = await extract.invoke({
@@ -87,42 +85,44 @@ const message = await extract.invoke({
   },
 });
 
-console.log(message.content); // Text sent back to the model
-console.log(message.artifact); // Full structured response for your application
+console.log(message.content); // Text for the model
+console.log(message.artifact); // Full API response for your app
 ```
 
-The artifact retains URLs, titles, publication dates, excerpts, request and
-session IDs, usage, warnings, and Extract's per-URL errors. Requested full
-content and error bodies remain there too. The integration does not rename or
-discard response fields.
+The artifact keeps every response field, including source details, request and
+session IDs, usage, warnings, and errors for individual URLs. Full page content
+and error bodies stay there too, when the API returns them.
 
-Model-facing text is limited to 20,000 characters by default, including source
-metadata and notices. A source URL is shown in full before its text; if it
-cannot fit, that section is omitted. Truncation is marked. The same budget is
-requested from the API for excerpts, but the local limit still applies when
-metadata or full content makes the response larger. The artifact is **not**
-truncated, so apply your own storage limits if you persist it.
+The text sent to the model is capped at 20,000 characters by default, including
+source details and notices. Each source URL appears in full before its text.
+If the URL won't fit, the tool leaves out that source's section. A notice tells
+the model when output has been shortened.
 
-## Configure requests
+The tools ask the API for the same excerpt budget, then apply the text limit
+locally to account for source details and full content. The artifact stays
+complete, so you'll need your own storage limit if you save it.
+
+## Change the settings
 
 | Option | Applies to | Default / behavior |
 | --- | --- | --- |
-| `apiKey` | Both | Reads `PARALLEL_API_KEY` when omitted |
-| `client` | Both | An existing `Parallel` SDK client; use instead of `apiKey` |
+| `apiKey` | Both | Uses `PARALLEL_API_KEY` if you don't pass a key |
+| `client` | Both | Your own `Parallel` SDK client; use instead of `apiKey` |
 | `maxOutputChars` | Both | 20,000; a safe integer of at least 1,024 |
-| `sessionId` | Both | Optional; reuse one ID across related Search and Extract calls |
+| `sessionId` | Both | Optional; share one ID across related Search and Extract calls |
 | `fetchPolicy` | Both | SDK policy for cache freshness and live fetching |
 | `mode` | Search | `advanced`; also supports `turbo`, `fast`, and `basic` |
 | `maxResults` | Search | 10; an integer from 1 to 40 |
 | `sourcePolicy` | Search | SDK domain and freshness policy |
 | `fullContent` | Extract | `false`; accepts `true` or SDK full-content settings |
 
-Search policy does not restrict URLs passed to Extract. The application owns
-any additional URL restrictions. Full content stays in the artifact; the text
-prefers relevant excerpts and uses full content only when excerpts are absent.
+`sourcePolicy` applies only to Search. If your app needs to restrict Extract
+URLs, check them before calling the tool. When you request full content, it
+stays in the artifact. The text uses excerpts where available and falls back
+to full content when there are none.
 
-Inject a client when you need SDK options such as retries or timeouts. Add
-`parallel-web` as a direct dependency of your application to use this example:
+To set retries or timeouts, pass your own SDK client. Add `parallel-web` as a
+direct dependency of your app to use this example:
 
 ```ts
 import { Parallel } from 'parallel-web';
@@ -143,40 +143,39 @@ const pending = searchWithClient.invoke(
 await pending;
 ```
 
-Cancellation is checked before dispatch and passed to the SDK for in-flight
-requests. LangChain runnable timeouts also reach the SDK through their signal.
-Authentication, rate-limit, timeout, and other SDK errors reject the invocation;
-they are not converted into successful text. Extract can return a successful
-HTTP response with failures for individual URLs. Those failures are summarized
-in the text and preserved in `artifact.errors`. A failure count stays visible
-even when the text limit omits individual error details.
+An already-aborted signal stops the call before it sends a request. Aborting
+during a request cancels it through the SDK. LangChain runnable timeouts use
+the same signal path.
 
-The tools use authenticated Search and Extract. They do not use anonymous
-Search MCP or change your account's access, limits, or billing. Search and
-Extract usage follows your Parallel account terms. SDK requests include an
-`X-Tool-Calling-Package` header identifying this package and version.
+SDK errors, including authentication failures, rate limits, and timeouts,
+reject the tool call. Extract can also succeed for some URLs and fail for
+others. You'll see those failures in the text and in `artifact.errors`. The
+failure count stays visible even when the text limit leaves out error details.
+
+Calls use your Parallel API key and your account's access, limits, and billing.
+Requests include an `X-Tool-Calling-Package` header with the package name and version.
 
 ## Run a research agent
 
-The [research example](./examples/research.mjs) uses a real LangChain agent with
-both tools. It shares a session ID, asks the agent to read relevant sources,
-and requires citations in the answer. Retrieved content is treated as untrusted
-data. The example's model adapter is a development dependency, not a runtime
-dependency of this package.
+The [research example](./examples/research.mjs) puts both tools into a LangChain
+agent. Each run gets a new session ID, shared across its Search and Extract calls.
+The prompt asks the agent to read sources, cite them in its answer, and ignore
+instructions found in retrieved pages. The example's model adapter is a
+development dependency.
 
 Set `PARALLEL_API_KEY`, `OPENAI_API_KEY`, and `RESEARCH_MODEL` in your environment.
-Choose a model available to your account that supports tool calling. After the
-source setup above, run from the repository root:
+Choose a model your account can access that supports tool calling. After the
+local setup above, run this from the repo root:
 
 ```bash
 corepack pnpm --filter @parallel-web/langchain example:research -- \
   'What are the current Parallel Search modes? Cite the official documentation.'
 ```
 
-This command makes live API calls and can incur Parallel and model-provider
-usage charges. Missing configuration fails before network access. The
-credential-free tests exercise the same agent flow with a scripted model and
-controlled SDK transport; passing those tests is not a live-service result.
+This makes live calls to Parallel and your model provider, so normal usage
+charges apply. Missing environment variables stop the example before it makes
+any requests. The tests run the same agent flow with a scripted model and
+test responses, without calling either service.
 
 ## Development
 
@@ -186,6 +185,6 @@ corepack pnpm --filter @parallel-web/langchain typecheck
 corepack pnpm --filter @parallel-web/langchain build
 ```
 
-Run the root checks before contributing. Do not publish from a feature branch.
-An npm release and any upstream LangChain documentation or recommendation need
-their own review after this package is accepted.
+Run the root checks before opening a PR. Adding this package doesn't publish
+it to npm. The first release needs a Parallel npm organization owner to follow
+the [publishing guide](../../PUBLISHING.md) from an updated `main` checkout.
