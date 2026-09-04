@@ -428,7 +428,7 @@ describe('bounded model content and complete artifacts', () => {
                 {
                   ...extractResponse.results[0],
                   excerpts: oversized === 'excerpts' ? ['x'.repeat(1024)] : [],
-                  full_content: 'x'.repeat(1024),
+                  full_content: 'Full page content '.repeat(100),
                 },
               ],
         errors: [
@@ -465,6 +465,12 @@ describe('bounded model content and complete artifacts', () => {
       expect(await extract.invoke(args)).toBe(content);
       if (response.results.length) {
         expect(content).toContain(response.results[0].url);
+        if (oversized === 'full content') {
+          expect(content).toContain('Full page content');
+          expect(content.indexOf(response.results[0].url)).toBeLessThan(
+            content.indexOf('Full page content')
+          );
+        }
       } else {
         expect(content).not.toContain('https://oversize.example.com/');
       }
@@ -496,40 +502,6 @@ describe('bounded model content and complete artifacts', () => {
     expect(content).toContain(response.results[0].url);
     expect(content.indexOf(response.results[0].url)).toBeLessThan(
       content.indexOf('Large title')
-    );
-    expect(message.artifact).toStrictEqual(response);
-  });
-
-  it('bounds full content when an extracted page has no excerpts', async () => {
-    const response = {
-      ...extractResponse,
-      results: [
-        {
-          ...extractResponse.results[0],
-          excerpts: [],
-          full_content: 'Full page content '.repeat(5000),
-        },
-      ],
-    };
-    const { client } = fixtureClient(response);
-    const extract = createExtractTool({
-      client,
-      fullContent: true,
-      maxOutputChars: 1024,
-    });
-    const message = await extract.invoke({
-      type: 'tool_call',
-      id: 'call_bounded_extract',
-      name: extract.name,
-      args: { urls: [response.results[0].url] },
-    });
-    const content = String(message.content);
-    expect(content.length).toBeLessThanOrEqual(1024);
-    expect(content).toMatch(/truncat/i);
-    expect(content).toContain('Full page content');
-    expect(content).toContain(response.results[0].url);
-    expect(content.indexOf(response.results[0].url)).toBeLessThan(
-      content.indexOf('Full page content')
     );
     expect(message.artifact).toStrictEqual(response);
   });

@@ -27,7 +27,6 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
     "examples/research.mjs"
   ],
   "scripts": {
